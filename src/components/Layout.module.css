@@ -1,0 +1,222 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.header {
+  background: #1DA1F2;
+  color: white;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 52px;
+  flex-shrink: 0;
+}
+
+.usersToggle {
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: white;
+  border-radius: 4px;
+  padding: 4px 12px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-family: inherit;
+  white-space: nowrap;
+  transition: background 0.12s;
+}
+
+.usersToggle:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.usersToggleActive {
+  background: rgba(255, 255, 255, 0.35);
+  border-color: rgba(255, 255, 255, 0.7);
+}
+
+.body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  min-height: 0;
+  position: relative;
+}
+
+.usersDrawer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 240px;
+  background: #fff;
+  border-left: 1px solid #ddd;
+  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.14);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.2s ease;
+}
+
+.usersDrawerOpen {
+  transform: translateX(0);
+}
+
+.usersDrawerTab {
+  position: absolute;
+  left: -28px;
+  top: 80px;
+  width: 28px;
+  padding: 14px 0;
+  background: #1DA1F2;
+  color: white;
+  border: none;
+  border-radius: 6px 0 0 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: -2px 0 6px rgba(0, 0, 0, 0.15);
+  transition: background 0.12s;
+}
+
+.usersDrawerTab:hover {
+  background: #0d8fd9;
+}
+
+.usersDrawerTabText {
+  writing-mode: vertical-lr;
+  transform: rotate(180deg);
+  font-size: 0.72rem;
+  font-family: inherit;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.usersDrawerHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 12px 12px 10px;
+  border-bottom: 1px solid #eee;
+  flex-shrink: 0;
+}
+
+.usersDrawerTitle {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #333;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.usersDrawerHint {
+  font-size: 0.72rem;
+  color: #aaa;
+  margin-top: 2px;
+}
+
+.usersDrawerClose {
+  background: none;
+  border: none;
+  font-size: 1.3rem;
+  color: #bbb;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.usersDrawerClose:hover {
+  color: #333;
+}
+
+.usersDrawerBody {
+  flex: 1;
+  overflow-y: scroll;
+  padding: 10px 12px;
+}
+
+.left {
+  border-right: 1px solid #ddd;
+  overflow-y: auto;
+  background: #fff;
+}
+
+.right {
+  display: flex;
+  flex-direction: column;
+  background: #f7f8fa;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sectionHeading {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #555;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+
+.previewSection {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 16px 8px;
+  overflow-y: auto;
+}
+
+.outputSection {
+  flex: 0 0 auto;
+  max-height: 45%;
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 16px 16px;
+  border-top: 1px solid #ddd;
+  overflow-y: auto;
+}
+
+@media (max-width: 900px) {
+  .shell {
+    height: auto;
+    overflow: visible;
+  }
+
+  .body {
+    grid-template-columns: 1fr;
+  }
+
+  .left {
+    border-right: none;
+    border-bottom: 1px solid #ddd;
+    overflow-y: visible;
+    max-height: none;
+  }
+
+  .right {
+    overflow: visible;
+    max-height: none;
+  }
+
+  .previewSection,
+  .outputSection {
+    overflow: visible;
+    max-height: none;
+    padding: 12px 16px;
+  }
+
+  .outputSection {
+    border-top: 1px solid #ddd;
+  }
+}

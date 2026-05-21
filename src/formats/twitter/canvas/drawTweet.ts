@@ -1,0 +1,364 @@
+// Layout + paint for the canvas tweet renderer.
+//
+// `layoutTweet` does a measure pass over the post and produces a flat list of
+// drawing primitives plus the total height. `paintTweet` executes those
+// primitives against a real 2D context. Splitting the two lets us size the
+// canvas (which clears it) before any drawing happens, and keeps the layout
+// math inspectable.
+
+import type { TwitterPost } from '../types';
+import type { ImageMap } from './images';
+import { wrapText, type WrappedText } from './text';
+import { font, lineHeight, theme, type Theme } from './theme';
+
+type Prim =
+  | { t: 'rect'; x: number; y: number; w: number; h: number; fill?: string; stroke?: string; radius: number }
+  | { t: 'line'; x: number; y: number; w: number; color: string }
+  | { t: 'text'; x: number; y: number; text: string; font: string; color: string }
+  | { t: 'image'; x: number; y: number; w: number; h: number; img: HTMLImageElement | null; circle: boolean; radius: number };
+
+export interface TweetLayout {
+  width: number;
+  height: number;
+  prims: Prim[];
+}
+
+/** A measuring context: a 2D context used only for `measureText`. */
+export type MeasureContext = Pick<CanvasRenderingContext2D, 'measureText' | 'font'>;
+
+export function layoutTweet(
+  ctx: MeasureContext,
+  post: TwitterPost,
+  images: ImageMap,
+  t: Theme = theme,
+): TweetLayout {
+  const prims: Prim[] = [];
+  const innerLeft = t.padding;
+  const innerWidth = t.cardWidth - t.padding * 2;
+  let y = t.padding;
+
+  // Measure helper: set the font, then return a width-measuring callback.
+  const measurer = (size: number, weight: 'normal' | 'bold' = 'normal') => {
+    ctx.font = font(size, weight);
+    return (text: string) => ctx.measureText(text).width;
+  };
+  const widthOf = (text: string, size: number, weight: 'normal' | 'bold' = 'normal') =>
+    measurer(size, weight)(text);
+
+  // Draw a wrapped text block starting at (x, y); returns the y after it.
+  const drawWrapped = (
+    wrapped: WrappedText,
+    x: number,
+    startY: number,
+    size: number,
+    color: string,
+  ): number => {
+    let cy = startY;
+    const lh = lineHeight(size);
+    wrapped.forEach((paragraph, pi) => {
+      for (const line of paragraph) {
+        prims.push({ t: 'text', x, y: cy, text: line, font: font(size), color });
+        cy += lh;
+      }
+      if (pi < wrapped.length - 1) cy += t.paragraphGap;
+    });
+    return cy;
+  };
+
+  // ── Header: avatar + name/handle ────────────────────────────────────────
+  const headTextX = innerLeft + t.avatarSize + t.avatarGap;
+  prims.push({
+    t: 'image',
+    x: innerLeft,
+    y,
+    w: t.avatarSize,
+    h: t.avatarSize,
+    img: images.get(post.author.avatar.src) ?? null,
+    circle: true,
+    radius: 0,
+  });
+  prims.push({ t: 'text', x: headTextX, y, text: post.author.name, font: font(t.nameSize, 'bold'), color: t.text });
+  prims.push({
+    t: 'text',
+    x: headTextX,
+    y: y + lineHeight(t.nameSize),
+    text: `@${post.author.handle}`,
+    font: font(t.handleSize),
+    color: t.muted,
+  });
+  y += Math.max(t.avatarSize, lineHeight(t.nameSize) + lineHeight(t.handleSize)) + t.blockGap;
+
+  // ── Content ─────────────────────────────────────────────────────────────
+  if (post.content.trim() !== '') {
+    const wrapped = wrapText(measurer(t.contentSize), post.content, innerWidth);
+    y = drawWrapped(wrapped, innerLeft, y, t.contentSize, t.text);
+    y += t.blockGap;
+  }
+
+  // ── Inline image ──────────────────────────────────────────────────────────
+  if (post.image && post.image.src) {
+    const img = images.get(post.image.src) ?? null;
+    const ratio = img && img.naturalWidth ? img.naturalHeight / img.naturalWidth : 0.5625;
+    const h = innerWidth * ratio;
+    prims.push({ t: 'image', x: innerLeft, y, w: innerWidth, h, img, circle: false, radius: t.imageRadius });
+    y += h + t.blockGap;
+  }
+
+  // ── Quote tweet ───────────────────────────────────────────────────────────
+  if (post.quote.enabled && (post.quote.name || post.quote.content)) {
+    const boxX = innerLeft;
+    const boxTop = y;
+    const pad = t.quotePadding;
+    let qy = boxTop + pad;
+    const qTextX = boxX + pad + t.quoteAvatarSize + t.avatarGap;
+    // Remember where the quote's contents start so we can splice the box
+    // background in behind them once we know its height.
+    const quoteContentStart = prims.length;
+
+    prims.push({
+      t: 'image',
+      x: boxX + pad,
+      y: qy,
+      w: t.quoteAvatarSize,
+      h: t.quoteAvatarSize,
+      img: images.get(post.quote.avatar.src) ?? null,
+      circle: true,
+      radius: 0,
+    });
+    const qName = post.quote.name;
+    const qHandle = `@${post.quote.handle}`;
+    const qHeaderWidth = innerWidth - pad * 2 - t.quoteAvatarSize - t.avatarGap;
+    prims.push({ t: 'text', x: qTextX, y: qy, text: qName, font: font(t.quoteNameSize, 'bold'), color: t.text });
+    const qNameW = widthOf(qName, t.quoteNameSize, 'bold');
+    const qHandleW = widthOf(qHandle, t.handleSize);
+    if (qNameW + 6 + qHandleW <= qHeaderWidth) {
+      prims.push({ t: 'text', x: qTextX + qNameW + 6, y: qy, text: qHandle, font: font(t.handleSize), color: t.muted });
+      qy += Math.max(t.quoteAvatarSize, lineHeight(t.quoteNameSize)) + 4;
+    } else {
+      qy += lineHeight(t.quoteNameSize);
+      prims.push({ t: 'text', x: qTextX, y: qy, text: qHandle, font: font(t.handleSize), color: t.muted });
+      qy = Math.max(boxTop + pad + t.quoteAvatarSize, qy + lineHeight(t.handleSize)) + 4;
+    }
+
+    if (post.quote.content.trim() !== '') {
+      const qWidth = innerWidth - pad * 2;
+      const wrapped = wrapText(measurer(t.quoteContentSize), post.quote.content, qWidth);
+      qy = drawWrapped(wrapped, boxX + pad, qy, t.quoteContentSize, t.text);
+    }
+    const boxHeight = qy + pad - boxTop;
+    // Insert the box background behind the contents pushed since quoteContentStart.
+    prims.splice(quoteContentStart, 0, {
+      t: 'rect',
+      x: boxX,
+      y: boxTop,
+      w: innerWidth,
+      h: boxHeight,
+      stroke: t.border,
+      radius: t.borderRadius,
+    });
+    y = boxTop + boxHeight + t.blockGap;
+  }
+
+  // ── Timestamp ─────────────────────────────────────────────────────────────
+  const stamp = [post.time, post.relativeTime].filter(Boolean).join(' · ');
+  if (stamp) {
+    prims.push({ t: 'text', x: innerLeft, y, text: stamp, font: font(t.timestampSize), color: t.muted });
+    y += lineHeight(t.timestampSize) + t.blockGap;
+  }
+
+  // ── Stats label ─────────────────────────────────────────────────────────────
+  if (post.stats.showRow && post.stats.labels.trim() !== '') {
+    prims.push({ t: 'line', x: innerLeft, y, w: innerWidth, color: t.separator });
+    y += t.blockGap;
+    const wrapped = wrapText(measurer(t.statsSize), post.stats.labels, innerWidth);
+    y = drawWrapped(wrapped, innerLeft, y, t.statsSize, t.muted);
+    y += t.blockGap;
+  }
+
+  // ── Replies ───────────────────────────────────────────────────────────────
+  for (const reply of post.replies) {
+    prims.push({ t: 'line', x: innerLeft, y, w: innerWidth, color: t.separator });
+    y += t.blockGap;
+
+    const replyTextX = innerLeft + t.avatarSize + t.avatarGap;
+    const replyTextWidth = innerWidth - t.avatarSize - t.avatarGap;
+    const blockTop = y;
+    prims.push({
+      t: 'image',
+      x: innerLeft,
+      y,
+      w: t.avatarSize,
+      h: t.avatarSize,
+      img: images.get(reply.avatar.src) ?? null,
+      circle: true,
+      radius: 0,
+    });
+
+    let ry = y;
+    // Name + "@handle · time": same line if it fits, otherwise stacked.
+    prims.push({ t: 'text', x: replyTextX, y: ry, text: reply.name, font: font(t.nameSize, 'bold'), color: t.text });
+    const nameW = widthOf(reply.name, t.nameSize, 'bold');
+    const meta = `@${reply.handle}${reply.relativeTime ? ` · ${reply.relativeTime}` : ''}`;
+    const metaW = widthOf(meta, t.handleSize);
+    if (nameW + 6 + metaW <= replyTextWidth) {
+      prims.push({ t: 'text', x: replyTextX + nameW + 6, y: ry, text: meta, font: font(t.handleSize), color: t.muted });
+      ry += lineHeight(t.nameSize);
+    } else {
+      ry += lineHeight(t.nameSize);
+      prims.push({ t: 'text', x: replyTextX, y: ry, text: meta, font: font(t.handleSize), color: t.muted });
+      ry += lineHeight(t.handleSize);
+    }
+
+    // "Replying to @target"
+    const target = reply.replyingTo || post.author.handle;
+    if (target) {
+      const prefix = 'Replying to ';
+      prims.push({ t: 'text', x: replyTextX, y: ry, text: prefix, font: font(t.handleSize), color: t.muted });
+      const prefixW = widthOf(prefix, t.handleSize);
+      prims.push({ t: 'text', x: replyTextX + prefixW, y: ry, text: `@${target}`, font: font(t.handleSize), color: t.link });
+      ry += lineHeight(t.handleSize);
+    }
+
+    // Reply content.
+    if (reply.content.trim() !== '') {
+      const wrapped = wrapText(measurer(t.contentSize), reply.content, replyTextWidth);
+      ry = drawWrapped(wrapped, replyTextX, ry, t.contentSize, t.text);
+    }
+
+    // Stat icons.
+    if (reply.showStats) {
+      ry += 4;
+      const icons = [post.statIcons.reply, post.statIcons.retweet, post.statIcons.like];
+      let ix = replyTextX;
+      for (const icon of icons) {
+        const img = images.get(icon.src) ?? null;
+        const ratio = img && img.naturalHeight ? img.naturalWidth / img.naturalHeight : 1;
+        const w = t.statIconHeight * ratio;
+        prims.push({ t: 'image', x: ix, y: ry, w, h: t.statIconHeight, img, circle: false, radius: 0 });
+        // Advance past the icon plus the visible gap between icons.
+        ix += w + t.statIconGap;
+      }
+      ry += t.statIconHeight;
+    }
+
+    y = Math.max(blockTop + t.avatarSize, ry) + t.blockGap;
+  }
+
+  const height = y - t.blockGap + t.padding;
+
+  // Card background + border behind everything.
+  prims.unshift({ t: 'rect', x: 0.5, y: 0.5, w: t.cardWidth - 1, h: height - 1, fill: t.bg, stroke: t.border, radius: t.borderRadius });
+
+  return { width: t.cardWidth, height, prims };
+}
+
+export function paintTweet(ctx: CanvasRenderingContext2D, layout: TweetLayout, t: Theme = theme): void {
+  ctx.clearRect(0, 0, layout.width, layout.height);
+  ctx.textBaseline = 'top';
+
+  for (const p of layout.prims) {
+    switch (p.t) {
+      case 'rect': {
+        roundRectPath(ctx, p.x, p.y, p.w, p.h, p.radius);
+        if (p.fill) {
+          ctx.fillStyle = p.fill;
+          ctx.fill();
+        }
+        if (p.stroke) {
+          ctx.strokeStyle = p.stroke;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+        break;
+      }
+      case 'line': {
+        ctx.fillStyle = p.color;
+        ctx.fillRect(p.x, p.y, p.w, 1);
+        break;
+      }
+      case 'text': {
+        ctx.font = p.font;
+        ctx.fillStyle = p.color;
+        ctx.fillText(p.text, p.x, p.y);
+        break;
+      }
+      case 'image': {
+        drawImagePrim(ctx, p, t);
+        break;
+      }
+    }
+  }
+}
+
+function drawImagePrim(
+  ctx: CanvasRenderingContext2D,
+  p: Extract<Prim, { t: 'image' }>,
+  t: Theme,
+): void {
+  ctx.save();
+  if (p.circle) {
+    ctx.beginPath();
+    ctx.arc(p.x + p.w / 2, p.y + p.h / 2, p.w / 2, 0, Math.PI * 2);
+    ctx.clip();
+  } else if (p.radius > 0) {
+    roundRectPath(ctx, p.x, p.y, p.w, p.h, p.radius);
+    ctx.clip();
+  }
+
+  if (p.img) {
+    drawCover(ctx, p.img, p.x, p.y, p.w, p.h);
+  } else {
+    ctx.fillStyle = t.placeholder;
+    ctx.fillRect(p.x, p.y, p.w, p.h);
+  }
+  ctx.restore();
+
+  // Hairline border on non-circular images for definition.
+  if (!p.circle && p.radius > 0) {
+    roundRectPath(ctx, p.x + 0.5, p.y + 0.5, p.w - 1, p.h - 1, p.radius);
+    ctx.strokeStyle = t.border;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+}
+
+/** Draw `img` covering the target box (object-fit: cover), centered. */
+function drawCover(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): void {
+  const iw = img.naturalWidth || img.width;
+  const ih = img.naturalHeight || img.height;
+  if (!iw || !ih) {
+    ctx.drawImage(img, x, y, w, h);
+    return;
+  }
+  const scale = Math.max(w / iw, h / ih);
+  const dw = iw * scale;
+  const dh = ih * scale;
+  const dx = x + (w - dw) / 2;
+  const dy = y + (h - dh) / 2;
+  ctx.drawImage(img, dx, dy, dw, dh);
+}
+
+function roundRectPath(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+): void {
+  const radius = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.arcTo(x + w, y, x + w, y + h, radius);
+  ctx.arcTo(x + w, y + h, x, y + h, radius);
+  ctx.arcTo(x, y + h, x, y, radius);
+  ctx.arcTo(x, y, x + w, y, radius);
+  ctx.closePath();
+}

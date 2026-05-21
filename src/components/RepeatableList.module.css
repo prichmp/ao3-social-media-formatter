@@ -1,0 +1,83 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.item {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.btn {
+  background: #f0f0f0;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  padding: 2px 5px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1.2;
+}
+
+.btn:hover:not(:disabled) {
+  background: #e0e0e0;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.remove {
+  color: #c0392b;
+  border-color: #e0a0a0;
+  background: #fff5f5;
+}
+
+.remove:hover {
+  background: #fde8e8;
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+}
+
+.addBtn {
+  align-self: flex-start;
+  padding: 6px 14px;
+  background: #1DA1F2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+
+.addBtn:hover {
+  background: #0d8fd9;
+}
+
+.dropZone {
+  height: 6px;
+  border-radius: 3px;
+  background: transparent;
+  border: 2px dashed transparent;
+  transition: background 0.1s, border-color 0.1s, height 0.1s;
+}
+
+.dropZoneActive {
+  height: 28px;
+  background: #e8f4fd;
+  border-color: #1DA1F2;
+}

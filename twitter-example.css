@@ -1,0 +1,284 @@
+  #workskin .Arial {
+  font-family: Arial, sans-serif;
+}
+
+#workskin .Verdana {
+  font-family: Verdana, sans-serif;
+}
+
+#workskin .Helvetica {
+  font-family: Helvetica, sans-serif;
+}
+
+#workskin .Tahoma {
+  font-family: Tahoma, sans-serif;
+}
+
+#workskin .TrebuchetMS {
+  font-family: 'Trebuchet MS', sans-serif;
+}
+
+#workskin .TimesNewRoman {
+  font-family: 'Times New Roman', serif;
+}
+
+#workskin .Georgia {
+  font-family: Georgia, serif;
+}
+
+#workskin .Garamond {
+  font-family: Garamond, serif;
+}
+
+#workskin .CourierNew {
+  font-family: 'Courier New', monospace;
+}
+
+#workskin .Impact {
+  font-family: Impact, sans-serif;
+}
+
+#workskin .facebook-button {
+  background-color: #4267B2;
+}
+
+#workskin .circle-facebook {
+  border-radius: 20px;
+  background-color: #4267B2;
+  padding: 5px;
+}
+
+#workskin .twitter-blue {
+  border-radius: 20px;
+  background-color: #26a7de;
+  padding: 5px;
+}
+
+#workskin .red-button {
+  border-radius: 20px;
+  background-color: #b22222;
+  padding: 5px;
+}
+
+#workskin .red-text {
+  color: #b22222;
+}
+
+#workskin .follow-button {
+  color: #06bdff;
+}
+
+#workskin .largesttext {
+  font-size: xx-large;
+}
+
+#workskin .largertext {
+  font-size: x-large;
+}
+
+#workskin .selfnote {
+  width: 20vw;
+  text-align: center;
+  background: #ffffb399;
+  min-width: 15em;
+}
+
+#workskin .selfnotedouble {
+  border: 6px double;
+}
+
+#workskin .circular-container {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: inline-block;
+  position: relative;
+  margin-right: 5px;
+}
+
+#workskin .circular-container img {
+  width: 100%;
+  height: auto;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: none;
+  max-height: none;
+}
+
+#workskin .transparent-container {
+  background-color: rgba(255, 255, 255, 0);
+  padding: 1px;
+  margin: 0 0 0 45px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 1em;
+}
+
+#workskin .replying-container {
+  background-color: rgba(255, 255, 255, 0);
+  padding: 1px;
+  margin: 0 0 0 60px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 1em;
+}
+
+#workskin .icon-text-container {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+#workskin .icon-text-container img {
+  margin-right: 10px;
+  vertical-align: middle;
+  display: inline-block;
+}
+
+
+#workskin .twt {
+  float: center;
+  max-width: 450px;
+  min-width: 300px;
+  margin: 0em auto;
+  padding-left: 20px;
+  padding-right: 20px;
+  border: 1px solid #c7c7c7;
+  border-radius: 10px;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, "Helvetica Neue", sans-serif;
+}
+
+#workskin .twt-header {
+  overflow: hidden;
+  margin-bottom: -3em;
+}
+
+#workskin .twt-icon-container {
+  float: left;
+}
+
+#workskin .twt-icon {
+  border-radius: 50%;
+  width: 3.5em;
+}
+
+#workskin .twt-iconquote {
+  border-radius: 50%;
+  width: 2em;
+}
+
+#workskin .twt-id {
+  font-size: 1em;
+  padding-left: 1em;
+  overflow: hidden;
+}
+
+#workskin .twt-name {
+  font-weight: bold;
+}
+
+#workskin .twt-name:hover {
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+#workskin .twt-handle {
+  color: #657786;
+}
+
+#workskin .twt-handle:hover {
+  cursor: pointer;
+}
+
+#workskin .twt-content {
+  font-size: 1.3em;
+  margin-bottom: -1em;
+}
+
+#workskin .twt-contentquote {
+  margin-top: -1em;
+  font-size: 1em;
+}
+
+#workskin .twt-timestamp {
+  color: #657786;
+  font-size: 1em;
+}
+
+#workskin hr.twt-sep,
+#workskin hr.twt-sep-reply {
+  border: none;
+  height: 1px;
+  width: 100%;
+  background-color: #e6e6e6;
+}
+
+#workskin hr.twt-sep-reply {
+  margin-left: -20px;
+  padding-right: 40px;
+}
+
+#workskin .twt-stat1 {
+  color: #657786;
+  font-size: 0.9em;
+}
+
+#workskin .twt-quotebox {
+  padding-left: 10px;
+  padding-right: 10px;
+  border: 1px solid #c7c7c7;
+  border-radius: 10px;
+  margin-bottom: -1em;
+}
+
+#workskin .twt-image {
+  float: center;
+  max-width: 100%;
+  border: 1px solid #c7c7c7;
+  border-radius: 10px;
+  margin-bottom: -1em;
+}
+
+#workskin .twt-replybox {
+  margin-top: -2em;
+}
+
+#workskin .twt-icon-replycontainer {
+  float: left;
+}
+
+#workskin .twt-replycontainer {
+  padding-left: 1em;
+  overflow: hidden;
+}
+
+#workskin .twt-replycontent {
+  margin-top: -1em;
+}
+
+#workskin .twt-stat2 {
+  color: #657786;
+  font-size: 0.9em;
+  margin-top: -1em;
+}
+
+#workskin .twt-social {
+  float: left;
+  margin-right: 2em;
+  margin-bottom: -1em;
+}
+
+#workskin .twt-socialimg {
+  height: 13px;
+  margin-right: 3px;
+}
+
+#workskin .twt-hl {
+  color: #1DA1F2;
+}
+
+#workskin .twt-hl:hover {
+  text-decoration: underline;
+  cursor: pointer;
+}
