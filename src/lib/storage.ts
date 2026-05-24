@@ -1,8 +1,10 @@
 // Persisted app state in localStorage.
 //
-// `loadState` validates with a caller-supplied zod schema and throws on
-// mismatch -- we deliberately do not migrate or coerce. A bad value in
-// localStorage surfaces as an exception so the bug is visible.
+// `loadState` validates with a caller-supplied zod schema. On a validation
+// failure (zod) or parse failure (corrupt JSON) we clear the stored value
+// and return null -- the app reloads with defaults instead of crashing on
+// every open. Other localStorage access errors (private browsing, quota)
+// also fall through to null.
 
 import type { ZodType } from 'zod';
 
@@ -23,13 +25,30 @@ export function saveState(state: unknown): void {
 
 /**
  * Load and validate persisted state. Returns null if nothing is stored.
- * Throws ZodError (or SyntaxError from JSON.parse) if a value exists but
- * doesn't match `schema`.
+ * Bad data (ZodError or SyntaxError) is wiped from localStorage and null
+ * is returned, so the next render falls back to defaults rather than
+ * looping on a corrupt value.
  */
 export function loadState<T>(schema: ZodType<T>): T | null {
-  const raw = localStorage.getItem(KEY);
+  let raw: string | null;
+  try {
+    raw = localStorage.getItem(KEY);
+  } catch {
+    return null;
+  }
   if (!raw) return null;
-  return schema.parse(JSON.parse(raw));
+
+  try {
+    return schema.parse(JSON.parse(raw));
+  } catch (err) {
+    console.warn('Stored state failed validation; clearing.', err);
+    try {
+      localStorage.removeItem(KEY);
+    } catch {
+      // ignore
+    }
+    return null;
+  }
 }
 
 export function clearState(): void {

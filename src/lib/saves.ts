@@ -27,9 +27,27 @@ export const namedSaveSchema = z.object({
 const namedSaveListSchema = z.array(namedSaveSchema);
 
 export function loadSaves(): NamedSave[] {
-  const raw = localStorage.getItem(KEY);
+  let raw: string | null;
+  try {
+    raw = localStorage.getItem(KEY);
+  } catch {
+    return [];
+  }
   if (!raw) return [];
-  return namedSaveListSchema.parse(JSON.parse(raw));
+
+  try {
+    return namedSaveListSchema.parse(JSON.parse(raw));
+  } catch (err) {
+    // Same recovery posture as loadState: corrupt or shape-mismatched
+    // data is wiped so the app doesn't crash on every load.
+    console.warn('Stored saves failed validation; clearing.', err);
+    try {
+      localStorage.removeItem(KEY);
+    } catch {
+      // ignore
+    }
+    return [];
+  }
 }
 
 export function deleteSave(id: string): void {
