@@ -17,6 +17,9 @@ import { renderSegmentImage } from './livestream/canvas/renderSegmentImage';
 import { emailDefaults } from './email/defaults';
 import { EmailForm } from './email/Form';
 import { renderThreadImage } from './email/canvas/renderThreadImage';
+import { tumblrDefaults } from './tumblr/defaults';
+import { TumblrForm } from './tumblr/Form';
+import { renderPostImage } from './tumblr/canvas/renderPostImage';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const formats: FormatDefinition<any>[] = [
@@ -47,6 +50,13 @@ export const formats: FormatDefinition<any>[] = [
     defaults: emailDefaults,
     Form: EmailForm,
     renderImage: (canvas, state) => renderThreadImage(canvas, state),
+  },
+  {
+    id: 'tumblr',
+    label: 'Tumblr',
+    defaults: tumblrDefaults,
+    Form: TumblrForm,
+    renderImage: (canvas, state) => renderPostImage(canvas, state),
   },
 ];
 
