@@ -21,19 +21,24 @@ import type { IMessageChain } from './formats/imessage/types';
 import { imessageSchema } from './formats/imessage/schema';
 import { imessageDefaults } from './formats/imessage/defaults';
 import { chainToMarkdown } from './formats/imessage/markdown';
+import type { LivestreamSegment } from './formats/livestream/types';
+import { livestreamSchema } from './formats/livestream/schema';
+import { livestreamDefaults } from './formats/livestream/defaults';
+import { segmentToMarkdown } from './formats/livestream/markdown';
 import styles from './App.module.css';
 
 // IDs the active-format dropdown can hold. Adding a format means adding it
 // here plus an entry in `formats/registry.ts`.
-type FormatId = 'twitter' | 'imessage';
-const formatIdSchema = z.enum(['twitter', 'imessage']);
+type FormatId = 'twitter' | 'imessage' | 'livestream';
+const formatIdSchema = z.enum(['twitter', 'imessage', 'livestream']);
 
 // Schema for the full app state stored in localStorage. Validated on load;
 // any mismatch (or corrupt JSON) clears the key and reloads with defaults.
 const appStateSchema = z.object({
   activeFormat: formatIdSchema,
-  twitter: twitterPostSchema,
-  imessage: imessageSchema,
+  twitter:    twitterPostSchema,
+  imessage:   imessageSchema,
+  livestream: livestreamSchema,
   users: z.array(twitterUserSchema),
   currentSaveId: z.string().nullable(),
   currentSaveName: z.string().nullable(),
@@ -57,12 +62,20 @@ const importFileSchema = z.discriminatedUnion('format', [
     format: z.literal('imessage'),
     imessage: imessageSchema,
   }),
+  z.object({
+    version: z.number().optional(),
+    name: z.string().nullable().optional(),
+    savedAt: z.string().optional(),
+    format: z.literal('livestream'),
+    livestream: livestreamSchema,
+  }),
 ]);
 
 interface AppState {
   activeFormat: FormatId;
   twitter: TwitterPost;
   imessage: IMessageChain;
+  livestream: LivestreamSegment;
   users: TwitterUser[];
   currentSaveId: string | null;
   currentSaveName: string | null;
@@ -86,6 +99,16 @@ const EMPTY_IMESSAGE: IMessageChain = {
   showDeliveredOnLast: false,
 };
 
+const EMPTY_LIVESTREAM: LivestreamSegment = {
+  streamer: { avatar: { src: '', alt: '' }, name: '' },
+  title: '',
+  category: '',
+  viewerCount: '',
+  thumbnail: { src: '', alt: '' },
+  showLiveBadge: true,
+  chat: [],
+};
+
 function getInitialState(): AppState {
   const saved = loadState(appStateSchema);
   if (saved) return saved;
@@ -93,6 +116,7 @@ function getInitialState(): AppState {
     activeFormat: 'twitter',
     twitter: formats.find(f => f.id === 'twitter')!.defaults as TwitterPost,
     imessage: imessageDefaults,
+    livestream: livestreamDefaults,
     users: [],
     currentSaveId: null,
     currentSaveName: null,
@@ -107,16 +131,24 @@ type ModalState =
   | { type: 'load-confirm'; saveToLoad: NamedSave }
   | { type: 'import-confirm' };
 
+type ActiveData = TwitterPost | IMessageChain | LivestreamSegment;
+
 // Return the active format's data slot. Narrowed by `state.activeFormat`.
-function activeData(state: AppState): TwitterPost | IMessageChain {
-  return state.activeFormat === 'imessage' ? state.imessage : state.twitter;
+function activeData(state: AppState): ActiveData {
+  switch (state.activeFormat) {
+    case 'twitter':    return state.twitter;
+    case 'imessage':   return state.imessage;
+    case 'livestream': return state.livestream;
+  }
 }
 
-// Set the active format's data slot, leaving the inactive slot untouched.
-function setActiveData(state: AppState, data: TwitterPost | IMessageChain): AppState {
-  return state.activeFormat === 'imessage'
-    ? { ...state, imessage: data as IMessageChain }
-    : { ...state, twitter: data as TwitterPost };
+// Set the active format's data slot, leaving the inactive slots untouched.
+function setActiveData(state: AppState, data: ActiveData): AppState {
+  switch (state.activeFormat) {
+    case 'twitter':    return { ...state, twitter:    data as TwitterPost       };
+    case 'imessage':   return { ...state, imessage:   data as IMessageChain     };
+    case 'livestream': return { ...state, livestream: data as LivestreamSegment };
+  }
 }
 
 export default function App() {
@@ -151,55 +183,74 @@ export default function App() {
 
   function isCurrentDirty(): boolean {
     if (!state.currentSaveId) {
-      // Dirty if the active format's data has any meaningful content. The
-      // checks differ per format so an untouched iMessage doesn't read as
-      // dirty just because we have non-empty twitter defaults sitting in
-      // the other slot.
-      if (state.activeFormat === 'twitter') {
-        return (
-          state.twitter.content.trim() !== '' ||
-          state.twitter.author.name.trim() !== '' ||
-          state.twitter.attachment.type !== 'text' ||
-          state.twitter.replies.length > 0
-        );
+      // Dirty if the active format's data has any meaningful content. Each
+      // format has its own definition of "meaningful" so the inactive slot
+      // (which may hold defaults) doesn't bleed into the dirty check.
+      switch (state.activeFormat) {
+        case 'twitter':
+          return (
+            state.twitter.content.trim() !== '' ||
+            state.twitter.author.name.trim() !== '' ||
+            state.twitter.attachment.type !== 'text' ||
+            state.twitter.replies.length > 0
+          );
+        case 'imessage':
+          return (
+            state.imessage.contactName.trim() !== '' ||
+            state.imessage.contactAvatar.src.trim() !== '' ||
+            state.imessage.messages.length > 0
+          );
+        case 'livestream':
+          return (
+            state.livestream.streamer.name.trim() !== '' ||
+            state.livestream.title.trim() !== '' ||
+            state.livestream.chat.length > 0
+          );
       }
-      return (
-        state.imessage.contactName.trim() !== '' ||
-        state.imessage.contactAvatar.src.trim() !== '' ||
-        state.imessage.messages.length > 0
-      );
     }
     const allSaves = loadSaves();
     const named = allSaves.find(s => s.id === state.currentSaveId);
     if (!named) return true;
-    const namedData = named.format === 'twitter' ? named.twitter : named.imessage;
+    const namedData =
+      named.format === 'twitter'  ? named.twitter  :
+      named.format === 'imessage' ? named.imessage :
+                                    named.livestream;
     return JSON.stringify(namedData) !== JSON.stringify(currentData);
   }
 
   function doNamedSave(id: string, name: string) {
     const base = { id, name, savedAt: new Date().toISOString() };
-    const save: NamedSave = state.activeFormat === 'twitter'
-      ? { ...base, format: 'twitter', twitter: state.twitter }
-      : { ...base, format: 'imessage', imessage: state.imessage };
+    const save: NamedSave =
+      state.activeFormat === 'twitter'    ? { ...base, format: 'twitter',    twitter:    state.twitter    } :
+      state.activeFormat === 'imessage'   ? { ...base, format: 'imessage',   imessage:   state.imessage   } :
+                                            { ...base, format: 'livestream', livestream: state.livestream };
     upsertSave(save);
     setState(s => ({ ...s, currentSaveId: id, currentSaveName: name }));
   }
 
   function doLoad(save: NamedSave) {
     // Switching the active format AND loading the data lets the user keep
-    // independent work-in-progress in the inactive slot.
-    setState(s => save.format === 'twitter'
-      ? { ...s, activeFormat: 'twitter',  twitter: save.twitter,    currentSaveId: save.id, currentSaveName: save.name }
-      : { ...s, activeFormat: 'imessage', imessage: save.imessage,  currentSaveId: save.id, currentSaveName: save.name }
-    );
+    // independent work-in-progress in the inactive slots.
+    setState(s => {
+      const meta = { currentSaveId: save.id, currentSaveName: save.name };
+      switch (save.format) {
+        case 'twitter':    return { ...s, activeFormat: 'twitter',    twitter:    save.twitter,    ...meta };
+        case 'imessage':   return { ...s, activeFormat: 'imessage',   imessage:   save.imessage,   ...meta };
+        case 'livestream': return { ...s, activeFormat: 'livestream', livestream: save.livestream, ...meta };
+      }
+    });
     setModal({ type: 'none' });
   }
 
   function doImport(parsed: z.infer<typeof importFileSchema>) {
-    setState(s => parsed.format === 'twitter'
-      ? { ...s, activeFormat: 'twitter',  twitter: parsed.twitter,   currentSaveId: null, currentSaveName: parsed.name ?? null }
-      : { ...s, activeFormat: 'imessage', imessage: parsed.imessage, currentSaveId: null, currentSaveName: parsed.name ?? null }
-    );
+    setState(s => {
+      const meta = { currentSaveId: null, currentSaveName: parsed.name ?? null };
+      switch (parsed.format) {
+        case 'twitter':    return { ...s, activeFormat: 'twitter',    twitter:    parsed.twitter,    ...meta };
+        case 'imessage':   return { ...s, activeFormat: 'imessage',   imessage:   parsed.imessage,   ...meta };
+        case 'livestream': return { ...s, activeFormat: 'livestream', livestream: parsed.livestream, ...meta };
+      }
+    });
     setModal({ type: 'none' });
   }
 
@@ -226,9 +277,10 @@ export default function App() {
   // ── New ──────────────────────────────────────────────────────────────────
   function createNew() {
     setState(s => {
-      const emptied = s.activeFormat === 'twitter'
-        ? { ...s, twitter: EMPTY_TWITTER }
-        : { ...s, imessage: EMPTY_IMESSAGE };
+      const emptied =
+        s.activeFormat === 'twitter'    ? { ...s, twitter:    EMPTY_TWITTER    } :
+        s.activeFormat === 'imessage'   ? { ...s, imessage:   EMPTY_IMESSAGE   } :
+                                          { ...s, livestream: EMPTY_LIVESTREAM };
       return { ...emptied, currentSaveId: null, currentSaveName: null };
     });
   }
@@ -288,9 +340,10 @@ export default function App() {
       name: state.currentSaveName ?? undefined,
       savedAt: new Date().toISOString(),
     };
-    const data = state.activeFormat === 'twitter'
-      ? { ...base, format: 'twitter' as const,  twitter: state.twitter }
-      : { ...base, format: 'imessage' as const, imessage: state.imessage };
+    const data =
+      state.activeFormat === 'twitter'    ? { ...base, format: 'twitter'    as const, twitter:    state.twitter    } :
+      state.activeFormat === 'imessage'   ? { ...base, format: 'imessage'   as const, imessage:   state.imessage   } :
+                                            { ...base, format: 'livestream' as const, livestream: state.livestream };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -348,9 +401,10 @@ export default function App() {
   function handleReset() {
     if (!confirm('Reset all fields to the example defaults?')) return;
     setState(s => {
-      const reset = s.activeFormat === 'twitter'
-        ? { ...s, twitter: formats.find(f => f.id === 'twitter')!.defaults as TwitterPost }
-        : { ...s, imessage: imessageDefaults };
+      const reset =
+        s.activeFormat === 'twitter'    ? { ...s, twitter: formats.find(f => f.id === 'twitter')!.defaults as TwitterPost } :
+        s.activeFormat === 'imessage'   ? { ...s, imessage:   imessageDefaults   } :
+                                          { ...s, livestream: livestreamDefaults };
       return { ...reset, currentSaveId: null, currentSaveName: null };
     });
     clearState();
@@ -373,9 +427,10 @@ export default function App() {
   // Build the AO3-ready <img /> snippet. src is left empty for the user to
   // fill in; alt carries the active format's data as Markdown; width/height
   // come from the last successful render (ceiling'd to whole pixels).
-  const altMarkdown = state.activeFormat === 'twitter'
-    ? tweetToMarkdown(state.twitter)
-    : chainToMarkdown(state.imessage);
+  const altMarkdown =
+    state.activeFormat === 'twitter'    ? tweetToMarkdown(state.twitter)    :
+    state.activeFormat === 'imessage'   ? chainToMarkdown(state.imessage)   :
+                                          segmentToMarkdown(state.livestream);
   const imgTag = serializeMinified(selfClose('img', {
     src: '',
     alt: altMarkdown,

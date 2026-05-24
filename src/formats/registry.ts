@@ -11,6 +11,9 @@ import { renderTweetImage } from './twitter/canvas/renderTweetImage';
 import { imessageDefaults } from './imessage/defaults';
 import { IMessageForm } from './imessage/Form';
 import { renderChainImage } from './imessage/canvas/renderChainImage';
+import { livestreamDefaults } from './livestream/defaults';
+import { LivestreamForm } from './livestream/Form';
+import { renderSegmentImage } from './livestream/canvas/renderSegmentImage';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const formats: FormatDefinition<any>[] = [
@@ -27,6 +30,13 @@ export const formats: FormatDefinition<any>[] = [
     defaults: imessageDefaults,
     Form: IMessageForm,
     renderImage: (canvas, state) => renderChainImage(canvas, state),
+  },
+  {
+    id: 'livestream',
+    label: 'Livestream',
+    defaults: livestreamDefaults,
+    Form: LivestreamForm,
+    renderImage: (canvas, state) => renderSegmentImage(canvas, state),
   },
 ];
 
