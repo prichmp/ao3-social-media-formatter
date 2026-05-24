@@ -107,7 +107,7 @@ details[open] .sectionTitle::before {
   gap: 8px;
 }
 
-.quoteBox {
+.attachmentBox {
   background: #f4f8fd;
   border: 1px solid #c5dff8;
   border-radius: 6px;
@@ -115,6 +115,12 @@ details[open] .sectionTitle::before {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.attachmentDropTarget {
+  outline: 2px dashed #1DA1F2;
+  outline-offset: -2px;
+  background: #e8f4fd;
 }
 
 .statIcons {

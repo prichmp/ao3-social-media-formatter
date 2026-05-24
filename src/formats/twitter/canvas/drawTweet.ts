@@ -6,7 +6,7 @@
 // canvas (which clears it) before any drawing happens, and keeps the layout
 // math inspectable.
 
-import type { TwitterPost } from '../types';
+import type { TweetAttachment, TwitterPost } from '../types';
 import type { ImageMap } from './images';
 import { wrapText, type WrappedText } from './text';
 import { font, lineHeight, theme, type Theme } from './theme';
@@ -15,6 +15,7 @@ type Prim =
   | { t: 'rect'; x: number; y: number; w: number; h: number; fill?: string; stroke?: string; radius: number }
   | { t: 'line'; x: number; y: number; w: number; color: string }
   | { t: 'text'; x: number; y: number; text: string; font: string; color: string }
+  | { t: 'tri'; x1: number; y1: number; x2: number; y2: number; x3: number; y3: number; fill: string }
   | { t: 'image'; x: number; y: number; w: number; h: number; img: HTMLImageElement | null; circle: boolean; radius: number };
 
 export interface TweetLayout {
@@ -25,6 +26,22 @@ export interface TweetLayout {
 
 /** A measuring context: a 2D context used only for `measureText`. */
 export type MeasureContext = Pick<CanvasRenderingContext2D, 'measureText' | 'font'>;
+
+/** Trim a single line of text to fit `maxWidth`, appending an ellipsis. */
+function truncateToWidth(measure: (s: string) => number, text: string, maxWidth: number): string {
+  if (maxWidth <= 0 || text === '') return '';
+  if (measure(text) <= maxWidth) return text;
+  const ellipsis = '…';
+  let lo = 0;
+  let hi = text.length;
+  // Binary-search the largest prefix that fits with the ellipsis appended.
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (measure(text.slice(0, mid) + ellipsis) <= maxWidth) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo === 0 ? ellipsis : text.slice(0, lo) + ellipsis;
+}
 
 export function layoutTweet(
   ctx: MeasureContext,
@@ -65,6 +82,195 @@ export function layoutTweet(
     return cy;
   };
 
+  // Render an attachment block at (x, startY) constrained to `width`. Returns
+  // the y position after the block, or `startY` unchanged if the attachment
+  // renders nothing (text type, or quote/image with no data). Closes over
+  // `prims`, `images`, `t`, `widthOf`, `drawWrapped`, `measurer` to keep the
+  // call site terse.
+  const layoutAttachment = (att: TweetAttachment, x: number, startY: number, width: number): number => {
+    switch (att.type) {
+      case 'text':
+        return startY;
+      case 'image': {
+        if (!att.image.src) return startY;
+        const img = images.get(att.image.src) ?? null;
+        const ratio = img && img.naturalWidth ? img.naturalHeight / img.naturalWidth : 0.5625;
+        const h = width * ratio;
+        prims.push({ t: 'image', x, y: startY, w: width, h, img, circle: false, radius: t.imageRadius });
+        return startY + h;
+      }
+      case 'quote': {
+        if (!att.name && !att.content) return startY;
+        const boxTop = startY;
+        const pad = t.quotePadding;
+        let qy = boxTop + pad;
+        const qTextX = x + pad + t.quoteAvatarSize + t.avatarGap;
+        // Remember where the quote's contents start so we can splice the box
+        // background in behind them once we know its height.
+        const quoteContentStart = prims.length;
+
+        prims.push({
+          t: 'image',
+          x: x + pad,
+          y: qy,
+          w: t.quoteAvatarSize,
+          h: t.quoteAvatarSize,
+          img: images.get(att.avatar.src) ?? null,
+          circle: true,
+          radius: 0,
+        });
+        const qName = att.name;
+        const qHandle = `@${att.handle}`;
+        const qHeaderWidth = width - pad * 2 - t.quoteAvatarSize - t.avatarGap;
+        prims.push({ t: 'text', x: qTextX, y: qy, text: qName, font: font(t.quoteNameSize, 'bold'), color: t.text });
+        const qNameW = widthOf(qName, t.quoteNameSize, 'bold');
+        const qHandleW = widthOf(qHandle, t.handleSize);
+        if (qNameW + 6 + qHandleW <= qHeaderWidth) {
+          prims.push({ t: 'text', x: qTextX + qNameW + 6, y: qy, text: qHandle, font: font(t.handleSize), color: t.muted });
+          qy += Math.max(t.quoteAvatarSize, lineHeight(t.quoteNameSize)) + 4;
+        } else {
+          qy += lineHeight(t.quoteNameSize);
+          prims.push({ t: 'text', x: qTextX, y: qy, text: qHandle, font: font(t.handleSize), color: t.muted });
+          qy = Math.max(boxTop + pad + t.quoteAvatarSize, qy + lineHeight(t.handleSize)) + 4;
+        }
+
+        if (att.content.trim() !== '') {
+          const qWidth = width - pad * 2;
+          const wrapped = wrapText(measurer(t.quoteContentSize), att.content, qWidth);
+          qy = drawWrapped(wrapped, x + pad, qy, t.quoteContentSize, t.text);
+        }
+        const boxHeight = qy + pad - boxTop;
+        prims.splice(quoteContentStart, 0, {
+          t: 'rect',
+          x,
+          y: boxTop,
+          w: width,
+          h: boxHeight,
+          stroke: t.border,
+          radius: t.borderRadius,
+        });
+        return boxTop + boxHeight;
+      }
+      case 'video': {
+        const img = images.get(att.thumbnail.src) ?? null;
+        const ratio = img && img.naturalWidth ? img.naturalHeight / img.naturalWidth : 0.5625;
+        const h = width * ratio;
+        // 1) Thumbnail (or placeholder rect if no image).
+        prims.push({ t: 'image', x, y: startY, w: width, h, img, circle: false, radius: t.imageRadius });
+        // 2) Centered play-button overlay: a circle with a right-pointing triangle.
+        const ps = t.videoPlaySize;
+        const cx = x + width / 2;
+        const cy = startY + h / 2;
+        prims.push({ t: 'rect', x: cx - ps / 2, y: cy - ps / 2, w: ps, h: ps, fill: t.videoOverlay, radius: ps / 2 });
+        // Triangle sized to roughly half the circle, nudged right so its visual
+        // centroid lines up with the circle's center (an equilateral triangle's
+        // centroid sits 1/3 of the way from the base).
+        const triH = ps * 0.42;
+        const triW = triH * 0.92;
+        const triLeft = cx - triW / 3;
+        prims.push({
+          t: 'tri',
+          x1: triLeft,           y1: cy - triH / 2,
+          x2: triLeft + triW,    y2: cy,
+          x3: triLeft,           y3: cy + triH / 2,
+          fill: t.videoOverlayText,
+        });
+        // 3) Optional duration badge in the bottom-right corner.
+        if (att.duration.trim() !== '') {
+          const bw = widthOf(att.duration, t.videoBadgeSize, 'bold') + t.videoBadgePadX * 2;
+          // Use the raw font size (not lineHeight) so the badge hugs a single
+          // line of digits instead of including the 1.35x line-leading slack.
+          const bh = t.videoBadgeSize + t.videoBadgePadY * 2;
+          const bx = x + width - t.videoBadgeInset - bw;
+          const by = startY + h - t.videoBadgeInset - bh;
+          prims.push({ t: 'rect', x: bx, y: by, w: bw, h: bh, fill: t.videoOverlay, radius: t.videoBadgeRadius });
+          prims.push({
+            t: 'text',
+            x: bx + t.videoBadgePadX,
+            y: by + t.videoBadgePadY,
+            text: att.duration,
+            font: font(t.videoBadgeSize, 'bold'),
+            color: t.videoOverlayText,
+          });
+        }
+        return startY + h;
+      }
+      case 'music': {
+        const pad = t.musicPadding;
+        const art = t.musicArtSize;
+        const boxTop = startY;
+        const boxHeight = art + pad * 2;
+        // Card background + border first so subsequent prims stack on top.
+        prims.push({
+          t: 'rect',
+          x,
+          y: boxTop,
+          w: width,
+          h: boxHeight,
+          stroke: t.border,
+          radius: t.borderRadius,
+        });
+        // Album art with a small radius -- matches the inline image look.
+        prims.push({
+          t: 'image',
+          x: x + pad,
+          y: boxTop + pad,
+          w: art,
+          h: art,
+          img: images.get(att.albumArt.src) ?? null,
+          circle: false,
+          radius: 4,
+        });
+        // Play button on the right: a dark circle with a white right-pointing
+        // triangle. Vertically centered against the card, tucked into the
+        // right padding -- visual rhyme with the video overlay button.
+        const ps = t.musicPlaySize;
+        const playX = x + width - pad - ps;
+        const playY = boxTop + (boxHeight - ps) / 2;
+        prims.push({ t: 'rect', x: playX, y: playY, w: ps, h: ps, fill: t.videoOverlay, radius: ps / 2 });
+        const triH = ps * 0.42;
+        const triW = triH * 0.92;
+        const triLeft = playX + ps / 2 - triW / 3;
+        const triCy = playY + ps / 2;
+        prims.push({
+          t: 'tri',
+          x1: triLeft,        y1: triCy - triH / 2,
+          x2: triLeft + triW, y2: triCy,
+          x3: triLeft,        y3: triCy + triH / 2,
+          fill: t.videoOverlayText,
+        });
+        // Title + artist stacked, vertically centered against the album art.
+        // The available text width stops short of the play button so long
+        // strings overflow the card edge rather than crashing into the button.
+        const titleLH = lineHeight(t.musicTitleSize);
+        const artistLH = lineHeight(t.musicArtistSize);
+        const textBlockH = titleLH + artistLH;
+        const textX = x + pad + art + t.avatarGap;
+        const textRight = playX - t.avatarGap;
+        const textWidth = Math.max(0, textRight - textX);
+        let textY = boxTop + pad + (art - textBlockH) / 2;
+        prims.push({
+          t: 'text',
+          x: textX,
+          y: textY,
+          text: truncateToWidth(measurer(t.musicTitleSize, 'bold'), att.title, textWidth),
+          font: font(t.musicTitleSize, 'bold'),
+          color: t.text,
+        });
+        textY += titleLH;
+        prims.push({
+          t: 'text',
+          x: textX,
+          y: textY,
+          text: truncateToWidth(measurer(t.musicArtistSize), att.artist, textWidth),
+          font: font(t.musicArtistSize),
+          color: t.muted,
+        });
+        return boxTop + boxHeight;
+      }
+    }
+  };
+
   // ── Header: avatar + name/handle ────────────────────────────────────────
   const headTextX = innerLeft + t.avatarSize + t.avatarGap;
   prims.push({
@@ -95,68 +301,10 @@ export function layoutTweet(
     y += t.blockGap;
   }
 
-  // ── Inline image ──────────────────────────────────────────────────────────
-  if (post.image && post.image.src) {
-    const img = images.get(post.image.src) ?? null;
-    const ratio = img && img.naturalWidth ? img.naturalHeight / img.naturalWidth : 0.5625;
-    const h = innerWidth * ratio;
-    prims.push({ t: 'image', x: innerLeft, y, w: innerWidth, h, img, circle: false, radius: t.imageRadius });
-    y += h + t.blockGap;
-  }
-
-  // ── Quote tweet ───────────────────────────────────────────────────────────
-  if (post.quote.enabled && (post.quote.name || post.quote.content)) {
-    const boxX = innerLeft;
-    const boxTop = y;
-    const pad = t.quotePadding;
-    let qy = boxTop + pad;
-    const qTextX = boxX + pad + t.quoteAvatarSize + t.avatarGap;
-    // Remember where the quote's contents start so we can splice the box
-    // background in behind them once we know its height.
-    const quoteContentStart = prims.length;
-
-    prims.push({
-      t: 'image',
-      x: boxX + pad,
-      y: qy,
-      w: t.quoteAvatarSize,
-      h: t.quoteAvatarSize,
-      img: images.get(post.quote.avatar.src) ?? null,
-      circle: true,
-      radius: 0,
-    });
-    const qName = post.quote.name;
-    const qHandle = `@${post.quote.handle}`;
-    const qHeaderWidth = innerWidth - pad * 2 - t.quoteAvatarSize - t.avatarGap;
-    prims.push({ t: 'text', x: qTextX, y: qy, text: qName, font: font(t.quoteNameSize, 'bold'), color: t.text });
-    const qNameW = widthOf(qName, t.quoteNameSize, 'bold');
-    const qHandleW = widthOf(qHandle, t.handleSize);
-    if (qNameW + 6 + qHandleW <= qHeaderWidth) {
-      prims.push({ t: 'text', x: qTextX + qNameW + 6, y: qy, text: qHandle, font: font(t.handleSize), color: t.muted });
-      qy += Math.max(t.quoteAvatarSize, lineHeight(t.quoteNameSize)) + 4;
-    } else {
-      qy += lineHeight(t.quoteNameSize);
-      prims.push({ t: 'text', x: qTextX, y: qy, text: qHandle, font: font(t.handleSize), color: t.muted });
-      qy = Math.max(boxTop + pad + t.quoteAvatarSize, qy + lineHeight(t.handleSize)) + 4;
-    }
-
-    if (post.quote.content.trim() !== '') {
-      const qWidth = innerWidth - pad * 2;
-      const wrapped = wrapText(measurer(t.quoteContentSize), post.quote.content, qWidth);
-      qy = drawWrapped(wrapped, boxX + pad, qy, t.quoteContentSize, t.text);
-    }
-    const boxHeight = qy + pad - boxTop;
-    // Insert the box background behind the contents pushed since quoteContentStart.
-    prims.splice(quoteContentStart, 0, {
-      t: 'rect',
-      x: boxX,
-      y: boxTop,
-      w: innerWidth,
-      h: boxHeight,
-      stroke: t.border,
-      radius: t.borderRadius,
-    });
-    y = boxTop + boxHeight + t.blockGap;
+  // ── Attachment (image / quote / video / music) ───────────────────────────
+  const afterAttachment = layoutAttachment(post.attachment, innerLeft, y, innerWidth);
+  if (afterAttachment > y) {
+    y = afterAttachment + t.blockGap;
   }
 
   // ── Timestamp ─────────────────────────────────────────────────────────────
@@ -225,6 +373,15 @@ export function layoutTweet(
       ry = drawWrapped(wrapped, replyTextX, ry, t.contentSize, t.text);
     }
 
+    // Reply attachment, constrained to the reply text column. Add a small
+    // pre-gap when there's content above so the block doesn't sit flush.
+    const replyHasContent = reply.content.trim() !== '';
+    const attStartY = ry + (replyHasContent ? 6 : 0);
+    const afterReplyAtt = layoutAttachment(reply.attachment, replyTextX, attStartY, replyTextWidth);
+    if (afterReplyAtt > attStartY) {
+      ry = afterReplyAtt;
+    }
+
     // Stat icons.
     if (reply.showStats) {
       ry += 4;
@@ -280,6 +437,16 @@ export function paintTweet(ctx: CanvasRenderingContext2D, layout: TweetLayout, t
         ctx.font = p.font;
         ctx.fillStyle = p.color;
         ctx.fillText(p.text, p.x, p.y);
+        break;
+      }
+      case 'tri': {
+        ctx.beginPath();
+        ctx.moveTo(p.x1, p.y1);
+        ctx.lineTo(p.x2, p.y2);
+        ctx.lineTo(p.x3, p.y3);
+        ctx.closePath();
+        ctx.fillStyle = p.fill;
+        ctx.fill();
         break;
       }
       case 'image': {

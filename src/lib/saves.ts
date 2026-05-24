@@ -1,3 +1,11 @@
+// Named-save list persisted in localStorage.
+//
+// `loadSaves` validates the stored array with zod and throws on mismatch --
+// no migration. Writes are tolerant: if storage rejects (quota, etc.) we
+// drop the write so the rest of the app can keep running.
+
+import { z } from 'zod';
+import { twitterPostSchema } from '../formats/twitter/schema';
 import type { TwitterPost } from '../formats/twitter/types';
 
 const KEY = 'ao3-formatter-saves';
@@ -9,14 +17,19 @@ export interface NamedSave {
   twitter: TwitterPost;
 }
 
+export const namedSaveSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  savedAt: z.string(),
+  twitter: twitterPostSchema,
+});
+
+const namedSaveListSchema = z.array(namedSaveSchema);
+
 export function loadSaves(): NamedSave[] {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return [];
-    return JSON.parse(raw) as NamedSave[];
-  } catch {
-    return [];
-  }
+  const raw = localStorage.getItem(KEY);
+  if (!raw) return [];
+  return namedSaveListSchema.parse(JSON.parse(raw));
 }
 
 export function deleteSave(id: string): void {
@@ -36,6 +49,6 @@ export function upsertSave(save: NamedSave): void {
     else saves.unshift(save);
     localStorage.setItem(KEY, JSON.stringify(saves));
   } catch {
-    // Storage failure degrades gracefully
+    // Storage failure degrades gracefully.
   }
 }

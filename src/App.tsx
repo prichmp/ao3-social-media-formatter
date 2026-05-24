@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { z } from 'zod';
 import { Layout } from './components/Layout';
 import { CanvasPreview, type RenderStatus } from './components/CanvasPreview';
 import { DownloadButton } from './components/DownloadButton';
 import { DropdownMenu } from './components/DropdownMenu';
 import { UserListPanel } from './components/UserListPanel';
 import { Modal } from './components/Modal';
+import { ImgTagSnippet } from './components/ImgTagSnippet';
+import { tweetToMarkdown } from './lib/markdownBuilder';
+import { selfClose, serializeMinified } from './lib/htmlBuilder';
 import { formats } from './formats/registry';
 import { saveState, loadState, clearState } from './lib/storage';
 import { loadSaves, upsertSave, deleteSave } from './lib/saves';
@@ -12,7 +16,29 @@ import type { NamedSave } from './lib/saves';
 import { UserListContext } from './lib/UserListContext';
 import type { TwitterPost } from './formats/twitter/types';
 import type { TwitterUser } from './formats/twitter/types';
+import { twitterPostSchema, twitterUserSchema } from './formats/twitter/schema';
 import styles from './App.module.css';
+
+// Schema for the full app state stored in localStorage. Validated on load;
+// any mismatch throws -- we don't migrate.
+const appStateSchema = z.object({
+  activeFormat: z.string(),
+  twitter: twitterPostSchema,
+  users: z.array(twitterUserSchema),
+  currentSaveId: z.string().nullable(),
+  currentSaveName: z.string().nullable(),
+});
+
+// Schema for the wrapper object produced by handleExport (and consumed by
+// handleImportFile). `version`/`savedAt` are present in fresh exports but
+// optional so old exports without them still validate as long as `twitter`
+// is well-formed.
+const importFileSchema = z.object({
+  version: z.number().optional(),
+  name: z.string().nullable().optional(),
+  savedAt: z.string().optional(),
+  twitter: twitterPostSchema,
+});
 
 interface AppState {
   activeFormat: string;
@@ -25,8 +51,7 @@ interface AppState {
 const EMPTY_TWITTER: TwitterPost = {
   author: { avatar: { src: '', alt: '', width: 50, height: 50 }, name: '', handle: '' },
   content: '',
-  image: undefined,
-  quote: { enabled: false, avatar: { src: '', alt: '', width: 50, height: 50 }, name: '', handle: '', content: '' },
+  attachment: { type: 'text' },
   time: '',
   relativeTime: '',
   stats: { showRow: true, labels: '' },
@@ -35,21 +60,10 @@ const EMPTY_TWITTER: TwitterPost = {
 };
 
 function getInitialState(): AppState {
-  const saved = loadState<AppState>();
-  if (saved) return {
-    ...saved,
-    users: saved.users ?? [],
-    currentSaveId: saved.currentSaveId ?? null,
-    currentSaveName: saved.currentSaveName ?? null,
-    twitter: {
-      ...saved.twitter,
-      statIcons: saved.twitter.statIcons ?? formats[0].defaults.statIcons,
-      replies: (saved.twitter.replies ?? []).map(r => ({
-        ...r,
-        replyingTo: (r as { replyingTo?: string }).replyingTo ?? saved.twitter.author.handle,
-      })),
-    },
-  };
+  // loadState throws on shape mismatch -- the caller (React) will surface
+  // that as a render error. We don't try to repair persisted state.
+  const saved = loadState(appStateSchema);
+  if (saved) return saved;
   return {
     activeFormat: 'twitter',
     twitter: formats[0].defaults,
@@ -71,8 +85,13 @@ export default function App() {
   const [state, setState] = useState<AppState>(getInitialState);
   const [canvasEl, setCanvasEl] = useState<HTMLCanvasElement | null>(null);
   const [renderStatus, setRenderStatus] = useState<RenderStatus>('pending');
+  const [renderSize, setRenderSize] = useState<{ width: number; height: number } | null>(null);
   const [usersOpen, setUsersOpen] = useState(false);
   const handleStatusChange = useCallback((s: RenderStatus) => setRenderStatus(s), []);
+  const handleDimensionsChange = useCallback(
+    (s: { width: number; height: number } | null) => setRenderSize(s),
+    [],
+  );
   const [modal, setModal] = useState<ModalState>({ type: 'none' });
   const [nameInput, setNameInput] = useState('');
   const [saves, setSaves] = useState<NamedSave[]>([]);
@@ -96,12 +115,15 @@ export default function App() {
       return (
         state.twitter.content.trim() !== '' ||
         state.twitter.author.name.trim() !== '' ||
+        state.twitter.attachment.type !== 'text' ||
         state.twitter.replies.length > 0
       );
     }
     const allSaves = loadSaves();
     const named = allSaves.find(s => s.id === state.currentSaveId);
     if (!named) return true;
+    // Both sides went through schema validation, so a plain JSON-string
+    // comparison is enough -- no migration drift to worry about.
     return JSON.stringify(named.twitter) !== JSON.stringify(state.twitter);
   }
 
@@ -118,7 +140,7 @@ export default function App() {
   function doImport(twitter: TwitterPost, name: string | null) {
     setState(s => ({
       ...s,
-      twitter: { ...twitter, statIcons: twitter.statIcons ?? formats[0].defaults.statIcons },
+      twitter,
       currentSaveId: null,
       currentSaveName: name,
     }));
@@ -245,17 +267,17 @@ export default function App() {
     e.target.value = '';
     const reader = new FileReader();
     reader.onload = evt => {
+      // Two failure modes share a single user-facing alert: malformed JSON
+      // (SyntaxError from JSON.parse) and shape mismatch (ZodError from
+      // schema.parse). The user gets one actionable message either way; the
+      // detailed reason is logged for debugging.
       try {
         const raw = JSON.parse(evt.target?.result as string);
-        const twitter: TwitterPost = raw.twitter ?? raw;
-        const name: string | null = raw.name ?? null;
-        if (typeof twitter !== 'object' || !twitter.author) {
-          alert('Invalid file: missing expected fields.');
-          return;
-        }
-        doImport(twitter, name);
-      } catch {
-        alert('Could not read file. Make sure it is a valid JSON file exported from this tool.');
+        const parsed = importFileSchema.parse(raw);
+        doImport(parsed.twitter, parsed.name ?? null);
+      } catch (err) {
+        console.error('Import failed:', err);
+        alert('Could not import file. Make sure it is a valid JSON file exported from this tool.');
       }
     };
     reader.readAsText(file);
@@ -278,6 +300,20 @@ export default function App() {
   };
 
   const Form = format.Form as React.FC<{ state: TwitterPost; onChange: (s: TwitterPost) => void }>;
+
+  // Build the AO3-ready <img /> snippet. src is left empty for the user to
+  // fill in; alt carries the post as Markdown so the work still makes sense
+  // to screen readers and as a fallback if the image fails to load. Width/
+  // height come from the last successful render (logical CSS px).
+  const altMarkdown = tweetToMarkdown(state.twitter);
+  // Round up so the attribute is a whole pixel -- layout.height can leave a
+  // fractional remainder from line-height math.
+  const imgTag = serializeMinified(selfClose('img', {
+    src: '',
+    alt: altMarkdown,
+    width: renderSize ? Math.ceil(renderSize.width) : '',
+    height: renderSize ? Math.ceil(renderSize.height) : '',
+  }));
 
   return (
     <UserListContext.Provider value={userListContext}>
@@ -330,6 +366,7 @@ export default function App() {
             render={format.renderImage}
             onCanvasReady={setCanvasEl}
             onStatusChange={handleStatusChange}
+            onDimensionsChange={handleDimensionsChange}
           />
         }
         userList={<UserListPanel />}
@@ -342,6 +379,7 @@ export default function App() {
               ready={renderStatus === 'ok'}
               filename={`${state.currentSaveName ?? 'tweet'}.png`}
             />
+            <ImgTagSnippet imgTag={imgTag} disabled={renderStatus !== 'ok'} />
           </div>
         }
       />

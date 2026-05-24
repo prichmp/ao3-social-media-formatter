@@ -9,9 +9,11 @@ interface Props<T> {
   render: (canvas: HTMLCanvasElement, post: T) => Promise<RenderResult>;
   onCanvasReady?: (canvas: HTMLCanvasElement | null) => void;
   onStatusChange?: (status: RenderStatus) => void;
+  /** Logical (CSS-px) dimensions of the last successful render. */
+  onDimensionsChange?: (size: { width: number; height: number } | null) => void;
 }
 
-export function CanvasPreview<T>({ post, render, onCanvasReady, onStatusChange }: Props<T>) {
+export function CanvasPreview<T>({ post, render, onCanvasReady, onStatusChange, onDimensionsChange }: Props<T>) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const renderToken = useRef(0);
   const [failed, setFailed] = useState<string[]>([]);
@@ -36,13 +38,15 @@ export function CanvasPreview<T>({ post, render, onCanvasReady, onStatusChange }
         setFailed(result.failed);
         setError(result.ok ? null : result.error ?? 'render-failed');
         onStatusChange?.(result.ok ? 'ok' : 'error');
+        onDimensionsChange?.(result.ok ? { width: result.width, height: result.height } : null);
       })
       .catch(() => {
         if (token !== renderToken.current) return;
         setError('render-failed');
         onStatusChange?.('error');
+        onDimensionsChange?.(null);
       });
-  }, [post, render, onStatusChange]);
+  }, [post, render, onStatusChange, onDimensionsChange]);
 
   return (
     <div className={styles.wrapper}>

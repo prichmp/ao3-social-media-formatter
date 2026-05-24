@@ -16,6 +16,16 @@ export interface Theme {
   imageRadius: number;
   quotePadding: number;
   quoteAvatarSize: number;
+  videoPlaySize: number;
+  videoBadgeInset: number;
+  videoBadgePadX: number;
+  videoBadgePadY: number;
+  videoBadgeRadius: number;
+  videoOverlay: string;
+  videoOverlayText: string;
+  musicArtSize: number;
+  musicPadding: number;
+  musicPlaySize: number;
 
   // Colors
   bg: string;
@@ -35,6 +45,9 @@ export interface Theme {
   statsSize: number;
   quoteNameSize: number;
   quoteContentSize: number;
+  musicTitleSize: number;
+  musicArtistSize: number;
+  videoBadgeSize: number;
   lineHeightRatio: number;
   paragraphGap: number;
 
@@ -56,6 +69,16 @@ export const theme: Theme = {
   imageRadius: 10,
   quotePadding: 12,
   quoteAvatarSize: 24,
+  videoPlaySize: 64,
+  videoBadgeInset: 8,
+  videoBadgePadX: 6,
+  videoBadgePadY: 3,
+  videoBadgeRadius: 4,
+  videoOverlay: 'rgba(0, 0, 0, 0.6)',
+  videoOverlayText: '#ffffff',
+  musicArtSize: 64,
+  musicPadding: 12,
+  musicPlaySize: 36,
 
   bg: '#ffffff',
   text: '#0f1419',
@@ -74,6 +97,9 @@ export const theme: Theme = {
   statsSize: 13.6,
   quoteNameSize: 15.12,
   quoteContentSize: 16,
+  musicTitleSize: 16,
+  musicArtistSize: 14,
+  videoBadgeSize: 13,
   lineHeightRatio: 1.35,
   paragraphGap: 8,
 

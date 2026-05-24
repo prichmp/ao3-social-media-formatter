@@ -5,7 +5,7 @@
 // Hosts that don't send CORS headers cause `onerror` to fire instead of
 // loading a tainted image, so a failed load is a clean, recoverable signal.
 
-import type { TwitterPost } from '../types';
+import type { TweetAttachment, TwitterPost } from '../types';
 
 export type ImageMap = Map<string, HTMLImageElement | null>;
 
@@ -22,13 +22,25 @@ export function collectSrcs(post: TwitterPost): string[] {
     if (src) srcs.push(src);
   };
 
+  const addAttachment = (att: TweetAttachment) => {
+    switch (att.type) {
+      case 'image': add(att.image.src); break;
+      case 'quote': add(att.avatar.src); break;
+      case 'video': add(att.thumbnail.src); break;
+      case 'music': add(att.albumArt.src); break;
+      case 'text': break;
+    }
+  };
+
   add(post.author.avatar.src);
-  if (post.image) add(post.image.src);
-  if (post.quote.enabled) add(post.quote.avatar.src);
+  addAttachment(post.attachment);
   add(post.statIcons.reply.src);
   add(post.statIcons.retweet.src);
   add(post.statIcons.like.src);
-  for (const reply of post.replies) add(reply.avatar.src);
+  for (const reply of post.replies) {
+    add(reply.avatar.src);
+    addAttachment(reply.attachment);
+  }
 
   return [...new Set(srcs)];
 }

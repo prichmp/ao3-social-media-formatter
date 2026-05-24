@@ -17,14 +17,7 @@ export const twitterDefaults: TwitterPost = {
     handle: 'brightsidercherrybonfire',
   },
   content: 'Seriously I need to hear from Adora. Is she okay??',
-  image: undefined,
-  quote: {
-    enabled: false,
-    avatar: { src: '', alt: '', width: 50, height: 50 },
-    name: '',
-    handle: '',
-    content: '',
-  },
+  attachment: { type: 'text' },
   time: '9:40 AM',
   relativeTime: '10 hours ago',
   stats: {
@@ -46,6 +39,7 @@ export const twitterDefaults: TwitterPost = {
       relativeTime: '10 hours ago',
       replyingTo: 'brightsidercherrybonfire',
       content: "That was the most disrespectful thing I've ever seen happen at an awards show, I don't blame her for not wanting to make things any more public",
+      attachment: { type: 'text' },
       showStats: true,
     },
     {
@@ -61,6 +55,7 @@ export const twitterDefaults: TwitterPost = {
       relativeTime: '10 hours ago',
       replyingTo: 'brightsidercherrybonfire',
       content: "I can't believe the VMAs allowed that performance. We should be demanding answers from them, not her",
+      attachment: { type: 'text' },
       showStats: true,
     },
     {
@@ -76,6 +71,7 @@ export const twitterDefaults: TwitterPost = {
       relativeTime: '10 hours ago',
       replyingTo: 'brightsidercherrybonfire',
       content: "girl, her ex called her shitty. this is breaking news to no one who has ever been through a relationship, she'll be fine",
+      attachment: { type: 'text' },
       showStats: true,
     },
   ],

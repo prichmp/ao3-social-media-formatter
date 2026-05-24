@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import type { TwitterPost, TwitterReply, TwitterUser } from './types';
-import { TWITTER_USER_DRAG_TYPE } from './types';
+import type { AttachmentType, TweetAttachment, TwitterPost, TwitterReply, TwitterUser } from './types';
+import { TWITTER_USER_DRAG_TYPE, defaultAttachment } from './types';
 import type { ImageRef } from '../types';
 import { ImageInput } from '../../components/ImageInput';
 import { RepeatableList } from '../../components/RepeatableList';
@@ -87,6 +87,7 @@ function makeReply(authorHandle: string): TwitterReply {
     relativeTime: '',
     replyingTo: authorHandle,
     content: '',
+    attachment: { type: 'text' },
     showStats: true,
   };
 }
@@ -147,6 +148,20 @@ function ReplyCard({ reply, onChange, replyOptions }: {
       <Field label="Reply text">
         <TextArea value={reply.content} onChange={v => set('content', v)} rows={2} />
       </Field>
+      <Field label="Content type">
+        <select
+          className={styles.input}
+          value={reply.attachment.type}
+          onChange={e => set('attachment', defaultAttachment(e.target.value as AttachmentType))}
+        >
+          <option value="text">Text</option>
+          <option value="image">Image</option>
+          <option value="quote">Quote</option>
+          <option value="video">Video</option>
+          <option value="music">Music</option>
+        </select>
+      </Field>
+      <AttachmentFields attachment={reply.attachment} onChange={a => set('attachment', a)} />
       <label className={styles.checkLabel}>
         <input type="checkbox" checked={reply.showStats} onChange={e => set('showStats', e.target.checked)} />
         Show stat icons
@@ -158,6 +173,156 @@ function ReplyCard({ reply, onChange, replyOptions }: {
       )}
     </div>
   );
+}
+
+type QuoteAttachment = Extract<TweetAttachment, { type: 'quote' }>;
+
+function QuoteFields({ attachment, onChange }: {
+  attachment: QuoteAttachment;
+  onChange: (a: QuoteAttachment) => void;
+}) {
+  const { users, addUser } = useUserList();
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  // Same shape as the ReplyCard helper -- enable the button once both name
+  // and handle are non-empty, and only if this exact user isn't already
+  // present in the user list.
+  const canAddToList =
+    attachment.name.trim() !== '' &&
+    attachment.handle.trim() !== '' &&
+    !users.some(u => u.name === attachment.name && u.handle === attachment.handle);
+
+  function handleAddToUserList() {
+    addUser({
+      id: crypto.randomUUID(),
+      name: attachment.name,
+      handle: attachment.handle,
+      avatar: attachment.avatar,
+    });
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    setIsDragOver(false);
+    const data = e.dataTransfer.getData(TWITTER_USER_DRAG_TYPE);
+    if (!data) return;
+    e.preventDefault();
+    try {
+      const user = JSON.parse(data) as TwitterUser;
+      onChange({ ...attachment, name: user.name, handle: user.handle, avatar: { ...user.avatar } });
+    } catch {
+      // ignore malformed drag data
+    }
+  }
+
+  return (
+    <div
+      className={`${styles.attachmentBox}${isDragOver ? ` ${styles.attachmentDropTarget}` : ''}`}
+      onDragEnter={e => {
+        if (!e.dataTransfer.types.includes(TWITTER_USER_DRAG_TYPE)) return;
+        e.preventDefault();
+        setIsDragOver(true);
+      }}
+      onDragOver={e => {
+        if (!e.dataTransfer.types.includes(TWITTER_USER_DRAG_TYPE)) return;
+        e.preventDefault();
+      }}
+      onDragLeave={e => {
+        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+        setIsDragOver(false);
+      }}
+      onDrop={handleDrop}
+    >
+      <Field label="Quote avatar">
+        <ImageInput
+          value={attachment.avatar}
+          onChange={v => onChange({ ...attachment, avatar: v })}
+          defaultDimensions={50}
+          showDimensions={false}
+          uploadMaxSize={240}
+        />
+      </Field>
+      <Field label="Quote display name">
+        <TextInput value={attachment.name} onChange={v => onChange({ ...attachment, name: v })} />
+      </Field>
+      <Field label="Quote handle (@)">
+        <TextInput value={attachment.handle} onChange={v => onChange({ ...attachment, handle: v })} placeholder="handle" />
+      </Field>
+      <Field label="Quote text">
+        <TextArea value={attachment.content} onChange={v => onChange({ ...attachment, content: v })} rows={2} />
+      </Field>
+      {canAddToList && (
+        <button className={styles.addUserBtn} onClick={handleAddToUserList}>
+          + Add to user list
+        </button>
+      )}
+    </div>
+  );
+}
+
+function AttachmentFields({ attachment, onChange }: {
+  attachment: TweetAttachment;
+  onChange: (a: TweetAttachment) => void;
+}) {
+  // Each branch returns the attachment-specific sub-form. The 'text' case has
+  // nothing to render. All sub-forms share a tinted container so it's clear
+  // they belong to whichever type the dropdown selected.
+  switch (attachment.type) {
+    case 'text':
+      return null;
+    case 'image':
+      return (
+        <div className={styles.attachmentBox}>
+          <Field label="Image">
+            <ImageInput
+              value={attachment.image}
+              onChange={v => onChange({ ...attachment, image: v })}
+              showDimensions={false}
+            />
+          </Field>
+        </div>
+      );
+    case 'quote':
+      return <QuoteFields attachment={attachment} onChange={onChange} />;
+    case 'video':
+      return (
+        <div className={styles.attachmentBox}>
+          <Field label="Video thumbnail">
+            <ImageInput
+              value={attachment.thumbnail}
+              onChange={v => onChange({ ...attachment, thumbnail: v })}
+              showDimensions={false}
+            />
+          </Field>
+          <Field label="Duration">
+            <TextInput
+              value={attachment.duration}
+              onChange={v => onChange({ ...attachment, duration: v })}
+              placeholder="0:42"
+            />
+          </Field>
+        </div>
+      );
+    case 'music':
+      return (
+        <div className={styles.attachmentBox}>
+          <Field label="Album art">
+            <ImageInput
+              value={attachment.albumArt}
+              onChange={v => onChange({ ...attachment, albumArt: v })}
+              defaultDimensions={64}
+              showDimensions={false}
+              uploadMaxSize={240}
+            />
+          </Field>
+          <Field label="Track title">
+            <TextInput value={attachment.title} onChange={v => onChange({ ...attachment, title: v })} />
+          </Field>
+          <Field label="Artist">
+            <TextInput value={attachment.artist} onChange={v => onChange({ ...attachment, artist: v })} />
+          </Field>
+        </div>
+      );
+  }
 }
 
 export function TwitterForm({ state, onChange }: Props) {
@@ -245,46 +410,23 @@ export function TwitterForm({ state, onChange }: Props) {
       </Section>
 
       <Section title="Tweet content">
+        <Field label="Content type">
+          <select
+            className={styles.input}
+            value={state.attachment.type}
+            onChange={e => set('attachment', defaultAttachment(e.target.value as AttachmentType))}
+          >
+            <option value="text">Text</option>
+            <option value="image">Image</option>
+            <option value="quote">Quote</option>
+            <option value="video">Video</option>
+            <option value="music">Music</option>
+          </select>
+        </Field>
         <Field label="Tweet text">
           <TextArea value={state.content} onChange={v => set('content', v)} rows={4} placeholder="What's happening?" />
         </Field>
-        <Field label="Inline image (optional)">
-          <ImageInput
-            value={state.image ?? { src: '', alt: '' }}
-            onChange={v => set('image', v.src ? v : undefined)}
-            showDimensions={false}
-          />
-        </Field>
-        <label className={styles.checkLabel}>
-          <input
-            type="checkbox"
-            checked={state.quote.enabled}
-            onChange={e => set('quote', { ...state.quote, enabled: e.target.checked })}
-          />
-          Include quote tweet
-        </label>
-        {state.quote.enabled && (
-          <div className={styles.quoteBox}>
-            <Field label="Quote avatar">
-              <ImageInput
-                value={state.quote.avatar}
-                onChange={v => set('quote', { ...state.quote, avatar: v })}
-                defaultDimensions={50}
-                showDimensions={false}
-                uploadMaxSize={240}
-              />
-            </Field>
-            <Field label="Quote display name">
-              <TextInput value={state.quote.name} onChange={v => set('quote', { ...state.quote, name: v })} />
-            </Field>
-            <Field label="Quote handle (@)">
-              <TextInput value={state.quote.handle} onChange={v => set('quote', { ...state.quote, handle: v })} placeholder="handle" />
-            </Field>
-            <Field label="Quote text">
-              <TextArea value={state.quote.content} onChange={v => set('quote', { ...state.quote, content: v })} rows={2} />
-            </Field>
-          </div>
-        )}
+        <AttachmentFields attachment={state.attachment} onChange={a => set('attachment', a)} />
       </Section>
 
       <Section title="Stats row">
