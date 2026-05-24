@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { wrapLine, wrapText } from './text';
+import { wrapLine, wrapText } from './canvasText';
 
 // Stub metric: every character is 10px wide. So maxWidth 70 ≈ 7 chars.
 const measure = (s: string) => s.length * 10;

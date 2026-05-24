@@ -18,10 +18,11 @@ describe('loadSaves', () => {
   });
 
   it('round-trips a valid NamedSave through localStorage', () => {
-    upsertSave({ id: 'a', name: 'first', savedAt: '2026-01-01', twitter: twitterDefaults });
+    upsertSave({ id: 'a', name: 'first', savedAt: '2026-01-01', format: 'twitter', twitter: twitterDefaults });
     const saves = loadSaves();
     expect(saves).toHaveLength(1);
     expect(saves[0].name).toBe('first');
+    expect(saves[0].format).toBe('twitter');
   });
 
   it('clears localStorage and returns [] when the stored array fails zod validation', () => {

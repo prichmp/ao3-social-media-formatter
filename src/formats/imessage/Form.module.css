@@ -1,0 +1,137 @@
+/* Shape matches twitter/Form.module.css so the two formats feel uniform.
+   Duplicated rather than shared so iMessage stays decoupled. */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.section {
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.sectionTitle {
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 10px 16px;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #f8f8f8;
+}
+
+.sectionTitle::before {
+  content: '▸';
+  display: inline-block;
+  transition: transform 0.15s;
+}
+
+details[open] .sectionTitle::before {
+  transform: rotate(90deg);
+}
+
+.sectionBody {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.fieldLabel {
+  font-size: 0.8rem;
+  color: #555;
+  font-weight: 500;
+}
+
+.input {
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.input:focus {
+  outline: none;
+  border-color: #1982FC;
+  box-shadow: 0 0 0 2px rgba(25, 130, 252, 0.2);
+}
+
+.textarea {
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+}
+
+.textarea:focus {
+  outline: none;
+  border-color: #1982FC;
+  box-shadow: 0 0 0 2px rgba(25, 130, 252, 0.2);
+}
+
+.checkLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.messageCard {
+  background: #fafafa;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.senderRow {
+  display: flex;
+  gap: 6px;
+}
+
+.senderBtn {
+  flex: 1;
+  padding: 6px 10px;
+  background: #fff;
+  color: #333;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+
+.senderBtn:hover {
+  background: #f4f4f4;
+}
+
+.senderBtnActive {
+  background: #1982FC;
+  color: white;
+  border-color: #1982FC;
+}
+
+.senderBtnActive:hover {
+  background: #1471dc;
+}

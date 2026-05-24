@@ -17,32 +17,52 @@ import { UserListContext } from './lib/UserListContext';
 import type { TwitterPost } from './formats/twitter/types';
 import type { TwitterUser } from './formats/twitter/types';
 import { twitterPostSchema, twitterUserSchema } from './formats/twitter/schema';
+import type { IMessageChain } from './formats/imessage/types';
+import { imessageSchema } from './formats/imessage/schema';
+import { imessageDefaults } from './formats/imessage/defaults';
+import { chainToMarkdown } from './formats/imessage/markdown';
 import styles from './App.module.css';
 
+// IDs the active-format dropdown can hold. Adding a format means adding it
+// here plus an entry in `formats/registry.ts`.
+type FormatId = 'twitter' | 'imessage';
+const formatIdSchema = z.enum(['twitter', 'imessage']);
+
 // Schema for the full app state stored in localStorage. Validated on load;
-// any mismatch throws -- we don't migrate.
+// any mismatch (or corrupt JSON) clears the key and reloads with defaults.
 const appStateSchema = z.object({
-  activeFormat: z.string(),
+  activeFormat: formatIdSchema,
   twitter: twitterPostSchema,
+  imessage: imessageSchema,
   users: z.array(twitterUserSchema),
   currentSaveId: z.string().nullable(),
   currentSaveName: z.string().nullable(),
 });
 
 // Schema for the wrapper object produced by handleExport (and consumed by
-// handleImportFile). `version`/`savedAt` are present in fresh exports but
-// optional so old exports without them still validate as long as `twitter`
-// is well-formed.
-const importFileSchema = z.object({
-  version: z.number().optional(),
-  name: z.string().nullable().optional(),
-  savedAt: z.string().optional(),
-  twitter: twitterPostSchema,
-});
+// handleImportFile). Discriminated by `format` so a single file can carry
+// either format's payload.
+const importFileSchema = z.discriminatedUnion('format', [
+  z.object({
+    version: z.number().optional(),
+    name: z.string().nullable().optional(),
+    savedAt: z.string().optional(),
+    format: z.literal('twitter'),
+    twitter: twitterPostSchema,
+  }),
+  z.object({
+    version: z.number().optional(),
+    name: z.string().nullable().optional(),
+    savedAt: z.string().optional(),
+    format: z.literal('imessage'),
+    imessage: imessageSchema,
+  }),
+]);
 
 interface AppState {
-  activeFormat: string;
+  activeFormat: FormatId;
   twitter: TwitterPost;
+  imessage: IMessageChain;
   users: TwitterUser[];
   currentSaveId: string | null;
   currentSaveName: string | null;
@@ -55,18 +75,24 @@ const EMPTY_TWITTER: TwitterPost = {
   time: '',
   relativeTime: '',
   stats: { showRow: true, labels: '' },
-  statIcons: formats[0].defaults.statIcons,
+  statIcons: (formats.find(f => f.id === 'twitter')!.defaults as TwitterPost).statIcons,
   replies: [],
 };
 
+const EMPTY_IMESSAGE: IMessageChain = {
+  contactName: '',
+  contactAvatar: { src: '', alt: '' },
+  messages: [],
+  showDeliveredOnLast: false,
+};
+
 function getInitialState(): AppState {
-  // loadState throws on shape mismatch -- the caller (React) will surface
-  // that as a render error. We don't try to repair persisted state.
   const saved = loadState(appStateSchema);
   if (saved) return saved;
   return {
     activeFormat: 'twitter',
-    twitter: formats[0].defaults,
+    twitter: formats.find(f => f.id === 'twitter')!.defaults as TwitterPost,
+    imessage: imessageDefaults,
     users: [],
     currentSaveId: null,
     currentSaveName: null,
@@ -80,6 +106,18 @@ type ModalState =
   | { type: 'load' }
   | { type: 'load-confirm'; saveToLoad: NamedSave }
   | { type: 'import-confirm' };
+
+// Return the active format's data slot. Narrowed by `state.activeFormat`.
+function activeData(state: AppState): TwitterPost | IMessageChain {
+  return state.activeFormat === 'imessage' ? state.imessage : state.twitter;
+}
+
+// Set the active format's data slot, leaving the inactive slot untouched.
+function setActiveData(state: AppState, data: TwitterPost | IMessageChain): AppState {
+  return state.activeFormat === 'imessage'
+    ? { ...state, imessage: data as IMessageChain }
+    : { ...state, twitter: data as TwitterPost };
+}
 
 export default function App() {
   const [state, setState] = useState<AppState>(getInitialState);
@@ -109,48 +147,66 @@ export default function App() {
   }, [modal.type]);
 
   const format = formats.find(f => f.id === state.activeFormat) ?? formats[0];
+  const currentData = activeData(state);
 
   function isCurrentDirty(): boolean {
     if (!state.currentSaveId) {
+      // Dirty if the active format's data has any meaningful content. The
+      // checks differ per format so an untouched iMessage doesn't read as
+      // dirty just because we have non-empty twitter defaults sitting in
+      // the other slot.
+      if (state.activeFormat === 'twitter') {
+        return (
+          state.twitter.content.trim() !== '' ||
+          state.twitter.author.name.trim() !== '' ||
+          state.twitter.attachment.type !== 'text' ||
+          state.twitter.replies.length > 0
+        );
+      }
       return (
-        state.twitter.content.trim() !== '' ||
-        state.twitter.author.name.trim() !== '' ||
-        state.twitter.attachment.type !== 'text' ||
-        state.twitter.replies.length > 0
+        state.imessage.contactName.trim() !== '' ||
+        state.imessage.contactAvatar.src.trim() !== '' ||
+        state.imessage.messages.length > 0
       );
     }
     const allSaves = loadSaves();
     const named = allSaves.find(s => s.id === state.currentSaveId);
     if (!named) return true;
-    // Both sides went through schema validation, so a plain JSON-string
-    // comparison is enough -- no migration drift to worry about.
-    return JSON.stringify(named.twitter) !== JSON.stringify(state.twitter);
+    const namedData = named.format === 'twitter' ? named.twitter : named.imessage;
+    return JSON.stringify(namedData) !== JSON.stringify(currentData);
   }
 
-  function doNamedSave(id: string, name: string, twitter: TwitterPost) {
-    upsertSave({ id, name, savedAt: new Date().toISOString(), twitter });
+  function doNamedSave(id: string, name: string) {
+    const base = { id, name, savedAt: new Date().toISOString() };
+    const save: NamedSave = state.activeFormat === 'twitter'
+      ? { ...base, format: 'twitter', twitter: state.twitter }
+      : { ...base, format: 'imessage', imessage: state.imessage };
+    upsertSave(save);
     setState(s => ({ ...s, currentSaveId: id, currentSaveName: name }));
   }
 
   function doLoad(save: NamedSave) {
-    setState(s => ({ ...s, twitter: save.twitter, currentSaveId: save.id, currentSaveName: save.name }));
+    // Switching the active format AND loading the data lets the user keep
+    // independent work-in-progress in the inactive slot.
+    setState(s => save.format === 'twitter'
+      ? { ...s, activeFormat: 'twitter',  twitter: save.twitter,    currentSaveId: save.id, currentSaveName: save.name }
+      : { ...s, activeFormat: 'imessage', imessage: save.imessage,  currentSaveId: save.id, currentSaveName: save.name }
+    );
     setModal({ type: 'none' });
   }
 
-  function doImport(twitter: TwitterPost, name: string | null) {
-    setState(s => ({
-      ...s,
-      twitter,
-      currentSaveId: null,
-      currentSaveName: name,
-    }));
+  function doImport(parsed: z.infer<typeof importFileSchema>) {
+    setState(s => parsed.format === 'twitter'
+      ? { ...s, activeFormat: 'twitter',  twitter: parsed.twitter,   currentSaveId: null, currentSaveName: parsed.name ?? null }
+      : { ...s, activeFormat: 'imessage', imessage: parsed.imessage, currentSaveId: null, currentSaveName: parsed.name ?? null }
+    );
     setModal({ type: 'none' });
   }
 
   // ── Save ─────────────────────────────────────────────────────────────────
   function handleSave() {
     if (state.currentSaveName && state.currentSaveId) {
-      doNamedSave(state.currentSaveId, state.currentSaveName, state.twitter);
+      doNamedSave(state.currentSaveId, state.currentSaveName);
     } else {
       setNameInput('');
       setModal({ type: 'name', afterSave: () => {} });
@@ -162,14 +218,19 @@ export default function App() {
     if (!name) return;
     const id = state.currentSaveId ?? crypto.randomUUID();
     const afterSave = modal.type === 'name' ? modal.afterSave : () => {};
-    doNamedSave(id, name, state.twitter);
+    doNamedSave(id, name);
     setModal({ type: 'none' });
     afterSave();
   }
 
   // ── New ──────────────────────────────────────────────────────────────────
   function createNew() {
-    setState(s => ({ ...s, twitter: EMPTY_TWITTER, currentSaveId: null, currentSaveName: null }));
+    setState(s => {
+      const emptied = s.activeFormat === 'twitter'
+        ? { ...s, twitter: EMPTY_TWITTER }
+        : { ...s, imessage: EMPTY_IMESSAGE };
+      return { ...emptied, currentSaveId: null, currentSaveName: null };
+    });
   }
 
   function handleNew() {
@@ -182,7 +243,7 @@ export default function App() {
 
   function handleNewSaveFirst() {
     if (state.currentSaveName && state.currentSaveId) {
-      doNamedSave(state.currentSaveId, state.currentSaveName, state.twitter);
+      doNamedSave(state.currentSaveId, state.currentSaveName);
       setModal({ type: 'none' });
       createNew();
     } else {
@@ -207,7 +268,7 @@ export default function App() {
 
   function handleLoadConfirmSaveFirst(saveToLoad: NamedSave) {
     if (state.currentSaveName && state.currentSaveId) {
-      doNamedSave(state.currentSaveId, state.currentSaveName, state.twitter);
+      doNamedSave(state.currentSaveId, state.currentSaveName);
       doLoad(saveToLoad);
     } else {
       setNameInput('');
@@ -222,17 +283,19 @@ export default function App() {
 
   // ── Export ───────────────────────────────────────────────────────────────
   function handleExport() {
-    const data = {
+    const base = {
       version: 1,
       name: state.currentSaveName ?? undefined,
       savedAt: new Date().toISOString(),
-      twitter: state.twitter,
     };
+    const data = state.activeFormat === 'twitter'
+      ? { ...base, format: 'twitter' as const,  twitter: state.twitter }
+      : { ...base, format: 'imessage' as const, imessage: state.imessage };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${state.currentSaveName ?? 'ao3-post'}.json`;
+    a.download = `${state.currentSaveName ?? `ao3-${state.activeFormat}`}.json`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -252,7 +315,7 @@ export default function App() {
 
   function handleImportConfirmSaveFirst() {
     if (state.currentSaveName && state.currentSaveId) {
-      doNamedSave(state.currentSaveId, state.currentSaveName, state.twitter);
+      doNamedSave(state.currentSaveId, state.currentSaveName);
       setModal({ type: 'none' });
       triggerFileInput();
     } else {
@@ -268,13 +331,11 @@ export default function App() {
     const reader = new FileReader();
     reader.onload = evt => {
       // Two failure modes share a single user-facing alert: malformed JSON
-      // (SyntaxError from JSON.parse) and shape mismatch (ZodError from
-      // schema.parse). The user gets one actionable message either way; the
-      // detailed reason is logged for debugging.
+      // (SyntaxError) and shape mismatch (ZodError). Details go to console.
       try {
         const raw = JSON.parse(evt.target?.result as string);
         const parsed = importFileSchema.parse(raw);
-        doImport(parsed.twitter, parsed.name ?? null);
+        doImport(parsed);
       } catch (err) {
         console.error('Import failed:', err);
         alert('Could not import file. Make sure it is a valid JSON file exported from this tool.');
@@ -286,7 +347,12 @@ export default function App() {
   // ── Reset ─────────────────────────────────────────────────────────────────
   function handleReset() {
     if (!confirm('Reset all fields to the example defaults?')) return;
-    setState(s => ({ ...s, twitter: formats[0].defaults, currentSaveId: null, currentSaveName: null }));
+    setState(s => {
+      const reset = s.activeFormat === 'twitter'
+        ? { ...s, twitter: formats.find(f => f.id === 'twitter')!.defaults as TwitterPost }
+        : { ...s, imessage: imessageDefaults };
+      return { ...reset, currentSaveId: null, currentSaveName: null };
+    });
     clearState();
   }
 
@@ -299,21 +365,25 @@ export default function App() {
     removeUser: (id: string) => setState(s => ({ ...s, users: s.users.filter(u => u.id !== id) })),
   };
 
-  const Form = format.Form as React.FC<{ state: TwitterPost; onChange: (s: TwitterPost) => void }>;
+  // The registry erases per-format generics so we cast back to a wider
+  // `any` shape here; each Form / renderImage knows its own type internally.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const Form = format.Form as React.FC<{ state: any; onChange: (s: any) => void }>;
 
   // Build the AO3-ready <img /> snippet. src is left empty for the user to
-  // fill in; alt carries the post as Markdown so the work still makes sense
-  // to screen readers and as a fallback if the image fails to load. Width/
-  // height come from the last successful render (logical CSS px).
-  const altMarkdown = tweetToMarkdown(state.twitter);
-  // Round up so the attribute is a whole pixel -- layout.height can leave a
-  // fractional remainder from line-height math.
+  // fill in; alt carries the active format's data as Markdown; width/height
+  // come from the last successful render (ceiling'd to whole pixels).
+  const altMarkdown = state.activeFormat === 'twitter'
+    ? tweetToMarkdown(state.twitter)
+    : chainToMarkdown(state.imessage);
   const imgTag = serializeMinified(selfClose('img', {
     src: '',
     alt: altMarkdown,
     width: renderSize ? Math.ceil(renderSize.width) : '',
     height: renderSize ? Math.ceil(renderSize.height) : '',
   }));
+
+  const downloadFilename = `${state.currentSaveName ?? state.activeFormat}.png`;
 
   return (
     <UserListContext.Provider value={userListContext}>
@@ -334,7 +404,7 @@ export default function App() {
             <select
               className={styles.formatSelect}
               value={state.activeFormat}
-              onChange={e => setState(s => ({ ...s, activeFormat: e.target.value }))}
+              onChange={e => setState(s => ({ ...s, activeFormat: formatIdSchema.parse(e.target.value) }))}
               aria-label="Format"
             >
               {formats.map(f => (
@@ -356,13 +426,13 @@ export default function App() {
         }
         form={
           <Form
-            state={state.twitter}
-            onChange={twitter => setState(s => ({ ...s, twitter }))}
+            state={currentData}
+            onChange={data => setState(s => setActiveData(s, data))}
           />
         }
         preview={
           <CanvasPreview
-            post={state.twitter}
+            post={currentData}
             render={format.renderImage}
             onCanvasReady={setCanvasEl}
             onStatusChange={handleStatusChange}
@@ -377,7 +447,7 @@ export default function App() {
             <DownloadButton
               canvas={canvasEl}
               ready={renderStatus === 'ok'}
-              filename={`${state.currentSaveName ?? 'tweet'}.png`}
+              filename={downloadFilename}
             />
             <ImgTagSnippet imgTag={imgTag} disabled={renderStatus !== 'ok'} />
           </div>
@@ -426,7 +496,9 @@ export default function App() {
                 <li key={save.id} className={styles.saveItem}>
                   <div className={styles.saveInfo}>
                     <span className={styles.saveName}>{save.name}</span>
-                    <span className={styles.saveDate}>{new Date(save.savedAt).toLocaleString()}</span>
+                    <span className={styles.saveDate}>
+                      {save.format} · {new Date(save.savedAt).toLocaleString()}
+                    </span>
                   </div>
                   <div className={styles.saveItemActions}>
                     <button className={styles.modalConfirm} onClick={() => handleLoadSelect(save)}>Load</button>

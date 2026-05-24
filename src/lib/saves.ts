@@ -1,28 +1,37 @@
-// Named-save list persisted in localStorage.
+// Named-save list persisted in localStorage. Each save now carries a
+// `format` discriminator so the same store can hold twitter posts and
+// iMessage chains side by side -- loading switches the active format.
 //
-// `loadSaves` validates the stored array with zod and throws on mismatch --
-// no migration. Writes are tolerant: if storage rejects (quota, etc.) we
-// drop the write so the rest of the app can keep running.
+// Bad data is cleared (same recovery posture as loadState).
 
 import { z } from 'zod';
 import { twitterPostSchema } from '../formats/twitter/schema';
+import { imessageSchema } from '../formats/imessage/schema';
 import type { TwitterPost } from '../formats/twitter/types';
+import type { IMessageChain } from '../formats/imessage/types';
 
 const KEY = 'ao3-formatter-saves';
 
-export interface NamedSave {
+interface NamedSaveBase {
   id: string;
   name: string;
   savedAt: string;
-  twitter: TwitterPost;
 }
 
-export const namedSaveSchema = z.object({
+export type NamedSave =
+  | (NamedSaveBase & { format: 'twitter'; twitter: TwitterPost })
+  | (NamedSaveBase & { format: 'imessage'; imessage: IMessageChain });
+
+const baseFields = {
   id: z.string(),
   name: z.string(),
   savedAt: z.string(),
-  twitter: twitterPostSchema,
-});
+};
+
+export const namedSaveSchema = z.discriminatedUnion('format', [
+  z.object({ ...baseFields, format: z.literal('twitter'), twitter: twitterPostSchema }),
+  z.object({ ...baseFields, format: z.literal('imessage'), imessage: imessageSchema }),
+]);
 
 const namedSaveListSchema = z.array(namedSaveSchema);
 
@@ -38,8 +47,6 @@ export function loadSaves(): NamedSave[] {
   try {
     return namedSaveListSchema.parse(JSON.parse(raw));
   } catch (err) {
-    // Same recovery posture as loadState: corrupt or shape-mismatched
-    // data is wiped so the app doesn't crash on every load.
     console.warn('Stored saves failed validation; clearing.', err);
     try {
       localStorage.removeItem(KEY);

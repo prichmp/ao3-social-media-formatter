@@ -8,7 +8,7 @@
 
 import type { TweetAttachment, TwitterPost } from '../types';
 import type { ImageMap } from './images';
-import { wrapText, type WrappedText } from './text';
+import { wrapText, type WrappedText } from '../../../lib/canvasText';
 import { font, lineHeight, theme, type Theme } from './theme';
 
 type Prim =
