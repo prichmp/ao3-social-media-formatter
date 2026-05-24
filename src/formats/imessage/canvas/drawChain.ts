@@ -5,7 +5,7 @@
 // primitives. Same shape as the Twitter renderer (and the formats stay
 // independent), but the prim set is iMessage-specific.
 
-import type { IMessageChain, IMessage } from '../types';
+import type { IMessage, IMessageChain, MessageContent, MessageSender } from '../types';
 import type { ImageMap } from './images';
 import { wrapText, type WrappedText } from '../../../lib/canvasText';
 import { font, lineHeight, theme, type Theme } from './theme';
@@ -13,7 +13,8 @@ import { font, lineHeight, theme, type Theme } from './theme';
 type Prim =
   | { t: 'rect'; x: number; y: number; w: number; h: number; fill?: string; stroke?: string; radius: number }
   | { t: 'text'; x: number; y: number; text: string; font: string; color: string; align?: 'left' | 'center' | 'right' }
-  | { t: 'image'; x: number; y: number; w: number; h: number; img: HTMLImageElement | null; circle: boolean; placeholder: string };
+  | { t: 'tri'; x1: number; y1: number; x2: number; y2: number; x3: number; y3: number; fill: string }
+  | { t: 'image'; x: number; y: number; w: number; h: number; img: HTMLImageElement | null; circle: boolean; radius: number; placeholder: string };
 
 export interface ChainLayout {
   width: number;
@@ -38,6 +39,8 @@ export function layoutChain(
     ctx.font = font(size, weight);
     return (text: string) => ctx.measureText(text).width;
   };
+  const widthOf = (text: string, size: number, weight: 'normal' | 'bold' = 'normal') =>
+    measurer(size, weight)(text);
 
   // ── Header (gray nav bar with avatar + name) ─────────────────────────────
   prims.push({
@@ -49,7 +52,6 @@ export function layoutChain(
     fill: t.headerBg,
     radius: 0,
   });
-  // Bottom hairline
   prims.push({
     t: 'rect',
     x: 0,
@@ -59,7 +61,6 @@ export function layoutChain(
     fill: t.border,
     radius: 0,
   });
-  // Centered avatar
   const avatarX = (t.cardWidth - t.headerAvatarSize) / 2;
   prims.push({
     t: 'image',
@@ -69,10 +70,9 @@ export function layoutChain(
     h: t.headerAvatarSize,
     img: images.get(chain.contactAvatar.src) ?? null,
     circle: true,
+    radius: 0,
     placeholder: t.placeholder,
   });
-  // Contact name underneath the avatar (real iMessage uses small text +
-  // a chevron; we render just the name centered).
   prims.push({
     t: 'text',
     x: t.cardWidth / 2,
@@ -89,10 +89,113 @@ export function layoutChain(
   const bubbleMaxWidth = innerWidth * t.bubbleMaxWidthRatio;
   const lastMeIndex = lastIndexBySender(chain.messages, 'me');
 
+  // Lay out a single message body. Returns the bubble box {width, height}.
+  // Each branch emits all the prims for that body anchored at (boxX, boxY).
+  const layoutBody = (content: MessageContent, boxX: number, boxY: number, isMe: boolean): { width: number; height: number } => {
+    switch (content.type) {
+      case 'text': {
+        return renderTextBubble(content.text, boxX, boxY, isMe);
+      }
+      case 'image': {
+        const img = images.get(content.image.src) ?? null;
+        const { w, h } = mediaSize(img, bubbleMaxWidth, t);
+        prims.push({
+          t: 'image',
+          x: boxX,
+          y: boxY,
+          w,
+          h,
+          img,
+          circle: false,
+          radius: t.bubbleRadius,
+          placeholder: t.placeholder,
+        });
+        return { width: w, height: h };
+      }
+      case 'video': {
+        const img = images.get(content.thumbnail.src) ?? null;
+        const { w, h } = mediaSize(img, bubbleMaxWidth, t);
+        // Thumbnail.
+        prims.push({
+          t: 'image',
+          x: boxX,
+          y: boxY,
+          w,
+          h,
+          img,
+          circle: false,
+          radius: t.bubbleRadius,
+          placeholder: t.placeholder,
+        });
+        // Centered play-button overlay (circle + white triangle).
+        const ps = t.videoPlaySize;
+        const cx = boxX + w / 2;
+        const cy = boxY + h / 2;
+        prims.push({ t: 'rect', x: cx - ps / 2, y: cy - ps / 2, w: ps, h: ps, fill: t.videoOverlay, radius: ps / 2 });
+        // Centroid-correction so the triangle reads as visually centered.
+        const triH = ps * 0.42;
+        const triW = triH * 0.92;
+        const triLeft = cx - triW / 3;
+        prims.push({
+          t: 'tri',
+          x1: triLeft,        y1: cy - triH / 2,
+          x2: triLeft + triW, y2: cy,
+          x3: triLeft,        y3: cy + triH / 2,
+          fill: t.videoOverlayText,
+        });
+        // Optional duration badge tucked into the bottom-right.
+        if (content.duration.trim() !== '') {
+          const bw = widthOf(content.duration, t.videoBadgeSize, 'bold') + t.videoBadgePadX * 2;
+          // Raw size (not lineHeight) so the badge hugs the digits.
+          const bh = t.videoBadgeSize + t.videoBadgePadY * 2;
+          const bx = boxX + w - t.videoBadgeInset - bw;
+          const by = boxY + h - t.videoBadgeInset - bh;
+          prims.push({ t: 'rect', x: bx, y: by, w: bw, h: bh, fill: t.videoOverlay, radius: t.videoBadgeRadius });
+          prims.push({
+            t: 'text',
+            x: bx + t.videoBadgePadX,
+            y: by + t.videoBadgePadY,
+            text: content.duration,
+            font: font(t.videoBadgeSize, 'bold'),
+            color: t.videoOverlayText,
+          });
+        }
+        return { width: w, height: h };
+      }
+    }
+  };
+
+  // Wrap text into the bubble's content width, draw the colored bubble
+  // background, then the text prims on top. The bubble hugs its content
+  // up to bubbleMaxWidth.
+  const renderTextBubble = (text: string, boxX: number, boxY: number, isMe: boolean): { width: number; height: number } => {
+    const wrapped = wrapText(measurer(t.bubbleSize), text, bubbleMaxWidth - t.bubblePadX * 2);
+    const bubbleW = widthOfWrapped(wrapped, measurer(t.bubbleSize)) + t.bubblePadX * 2;
+    const bubbleH = heightOfWrapped(wrapped, t) + t.bubblePadY * 2;
+    prims.push({
+      t: 'rect',
+      x: boxX,
+      y: boxY,
+      w: bubbleW,
+      h: bubbleH,
+      fill: isMe ? t.meBg : t.themBg,
+      radius: t.bubbleRadius,
+    });
+    drawWrapped(
+      prims,
+      wrapped,
+      boxX + t.bubblePadX,
+      boxY + t.bubblePadY,
+      t.bubbleSize,
+      isMe ? t.meText : t.themText,
+      t,
+    );
+    return { width: bubbleW, height: bubbleH };
+  };
+
   chain.messages.forEach((msg, i) => {
     // Timestamp line, centered. Renders above the message it precedes.
     if (msg.timestamp.trim() !== '') {
-      // Slightly larger gap before a timestamp so groups read as separated.
       if (i > 0) y += t.timestampGap;
       prims.push({
         t: 'text',
@@ -105,42 +208,22 @@ export function layoutChain(
       });
       y += lineHeight(t.timestampSize) + t.timestampGap;
     } else if (i > 0 && chain.messages[i - 1].sender !== msg.sender) {
-      // Sender flip without a timestamp -- give it a slightly bigger gap.
       y += t.burstGap;
     } else if (i > 0) {
       y += t.bubbleGap;
     }
 
-    // Wrap the content to the bubble's max inner width.
-    const wrapped = wrapText(measurer(t.bubbleSize), msg.content, bubbleMaxWidth - t.bubblePadX * 2);
-    const bubbleWidth = widthOfWrapped(wrapped, measurer(t.bubbleSize)) + t.bubblePadX * 2;
-    const bubbleHeight = heightOfWrapped(wrapped, t) + t.bubblePadY * 2;
     const isMe = msg.sender === 'me';
-    const bubbleX = isMe
-      ? innerLeft + innerWidth - bubbleWidth
-      : innerLeft;
+    // Lay out the message body at the left edge first so it can size
+    // itself, then translate every prim it emitted to the correct side.
+    const startPrimsAt = prims.length;
+    const size = layoutBody(msg.content, innerLeft, y, isMe);
+    const targetX = isMe ? innerLeft + innerWidth - size.width : innerLeft;
+    if (targetX !== innerLeft) {
+      shiftPrimsX(prims, startPrimsAt, prims.length, targetX - innerLeft);
+    }
 
-    prims.push({
-      t: 'rect',
-      x: bubbleX,
-      y,
-      w: bubbleWidth,
-      h: bubbleHeight,
-      fill: isMe ? t.meBg : t.themBg,
-      radius: t.bubbleRadius,
-    });
-
-    drawWrapped(
-      prims,
-      wrapped,
-      bubbleX + t.bubblePadX,
-      y + t.bubblePadY,
-      t.bubbleSize,
-      isMe ? t.meText : t.themText,
-      t,
-    );
-
-    y += bubbleHeight;
+    y += size.height;
 
     // "Delivered" label under the final 'me' bubble.
     if (chain.showDeliveredOnLast && isMe && i === lastMeIndex) {
@@ -160,7 +243,7 @@ export function layoutChain(
 
   const height = y + t.bottomPad;
 
-  // Card background + hairline border, drawn behind everything.
+  // Card background drawn behind everything.
   prims.unshift({
     t: 'rect',
     x: 0,
@@ -172,6 +255,41 @@ export function layoutChain(
   });
 
   return { width: t.cardWidth, height, prims };
+}
+
+/**
+ * Decide the rendered width and height of a media bubble. Honors the
+ * image's natural aspect ratio when available; falls back to a portrait-ish
+ * default otherwise. Height is capped by `mediaMaxHeight` so a tall
+ * portrait gets scaled down (and its width follows) instead of bloating
+ * the chain.
+ */
+function mediaSize(
+  img: HTMLImageElement | null,
+  maxWidth: number,
+  t: Theme,
+): { w: number; h: number } {
+  const aspect = img && img.naturalWidth
+    ? img.naturalHeight / img.naturalWidth
+    : t.mediaDefaultAspectRatio;
+  let w = maxWidth;
+  let h = w * aspect;
+  if (h > t.mediaMaxHeight) {
+    h = t.mediaMaxHeight;
+    w = h / aspect;
+  }
+  return { w, h };
+}
+
+function shiftPrimsX(prims: Prim[], start: number, end: number, dx: number): void {
+  for (let i = start; i < end; i++) {
+    const p = prims[i];
+    if (p.t === 'tri') {
+      p.x1 += dx; p.x2 += dx; p.x3 += dx;
+    } else {
+      p.x += dx;
+    }
+  }
 }
 
 function widthOfWrapped(
@@ -219,7 +337,7 @@ function drawWrapped(
   return cy;
 }
 
-function lastIndexBySender(messages: IMessage[], sender: IMessage['sender']): number {
+function lastIndexBySender(messages: IMessage[], sender: MessageSender): number {
   for (let i = messages.length - 1; i >= 0; i--) {
     if (messages[i].sender === sender) return i;
   }
@@ -253,6 +371,16 @@ export function paintChain(ctx: CanvasRenderingContext2D, layout: ChainLayout): 
         ctx.textAlign = 'left';
         break;
       }
+      case 'tri': {
+        ctx.beginPath();
+        ctx.moveTo(p.x1, p.y1);
+        ctx.lineTo(p.x2, p.y2);
+        ctx.lineTo(p.x3, p.y3);
+        ctx.closePath();
+        ctx.fillStyle = p.fill;
+        ctx.fill();
+        break;
+      }
       case 'image': {
         drawImagePrim(ctx, p);
         break;
@@ -269,6 +397,9 @@ function drawImagePrim(
   if (p.circle) {
     ctx.beginPath();
     ctx.arc(p.x + p.w / 2, p.y + p.h / 2, p.w / 2, 0, Math.PI * 2);
+    ctx.clip();
+  } else if (p.radius > 0) {
+    roundRectPath(ctx, p.x, p.y, p.w, p.h, p.radius);
     ctx.clip();
   }
 

@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
-import type { IMessage, IMessageChain, MessageSender } from './types';
+import type {
+  IMessage,
+  IMessageChain,
+  MessageContent,
+  MessageContentType,
+  MessageSender,
+} from './types';
+import { defaultMessageContent } from './types';
 import type { ImageRef } from '../types';
 import { ImageInput } from '../../components/ImageInput';
 import { RepeatableList } from '../../components/RepeatableList';
@@ -67,7 +74,54 @@ function TextArea({ value, onChange, placeholder, rows = 2 }: {
 }
 
 function makeMessage(sender: MessageSender): IMessage {
-  return { id: crypto.randomUUID(), sender, content: '', timestamp: '' };
+  return { id: crypto.randomUUID(), sender, content: { type: 'text', text: '' }, timestamp: '' };
+}
+
+function ContentFields({ content, onChange }: {
+  content: MessageContent;
+  onChange: (c: MessageContent) => void;
+}) {
+  // One sub-form per message-content variant. Each emits its own fields;
+  // the parent dropdown swaps the active branch by replacing `content`
+  // with a fresh `defaultMessageContent(type)` so we don't carry stale
+  // fields across switches.
+  switch (content.type) {
+    case 'text':
+      return (
+        <Field label="Message text">
+          <TextArea value={content.text} onChange={v => onChange({ ...content, text: v })} />
+        </Field>
+      );
+    case 'image':
+      return (
+        <Field label="Image">
+          <ImageInput
+            value={content.image}
+            onChange={v => onChange({ ...content, image: v })}
+            showDimensions={false}
+          />
+        </Field>
+      );
+    case 'video':
+      return (
+        <>
+          <Field label="Video thumbnail">
+            <ImageInput
+              value={content.thumbnail}
+              onChange={v => onChange({ ...content, thumbnail: v })}
+              showDimensions={false}
+            />
+          </Field>
+          <Field label="Duration">
+            <TextInput
+              value={content.duration}
+              onChange={v => onChange({ ...content, duration: v })}
+              placeholder="0:42"
+            />
+          </Field>
+        </>
+      );
+  }
 }
 
 function MessageCard({ message, onChange }: {
@@ -96,9 +150,18 @@ function MessageCard({ message, onChange }: {
           </button>
         </div>
       </Field>
-      <Field label="Message text">
-        <TextArea value={message.content} onChange={v => set('content', v)} />
+      <Field label="Content type">
+        <select
+          className={styles.input}
+          value={message.content.type}
+          onChange={e => set('content', defaultMessageContent(e.target.value as MessageContentType))}
+        >
+          <option value="text">Text</option>
+          <option value="image">Image</option>
+          <option value="video">Video</option>
+        </select>
       </Field>
+      <ContentFields content={message.content} onChange={c => set('content', c)} />
       <Field label="Timestamp label (optional)">
         <TextInput
           value={message.timestamp}

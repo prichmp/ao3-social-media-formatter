@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { chainToMarkdown } from './markdown';
 import { imessageDefaults } from './defaults';
-import type { IMessageChain } from './types';
+import type { IMessageChain, MessageContent } from './types';
+
+const text = (s: string): MessageContent => ({ type: 'text', text: s });
 
 describe('chainToMarkdown', () => {
   it('opens with a "Conversation with NAME" line', () => {
@@ -13,8 +15,8 @@ describe('chainToMarkdown', () => {
     const chain: IMessageChain = {
       ...imessageDefaults,
       messages: [
-        { id: '1', sender: 'me',   content: 'hello', timestamp: '' },
-        { id: '2', sender: 'them', content: 'hi',    timestamp: '' },
+        { id: '1', sender: 'me',   content: text('hello'), timestamp: '' },
+        { id: '2', sender: 'them', content: text('hi'),    timestamp: '' },
       ],
     };
     const md = chainToMarkdown(chain);
@@ -25,7 +27,7 @@ describe('chainToMarkdown', () => {
   it('inserts italic timestamp lines when a message has one', () => {
     const chain: IMessageChain = {
       ...imessageDefaults,
-      messages: [{ id: '1', sender: 'me', content: 'hello', timestamp: 'Today 10:32 AM' }],
+      messages: [{ id: '1', sender: 'me', content: text('hello'), timestamp: 'Today 10:32 AM' }],
     };
     expect(chainToMarkdown(chain)).toContain('_Today 10:32 AM_');
   });
@@ -46,5 +48,29 @@ describe('chainToMarkdown', () => {
       showDeliveredOnLast: true,
     };
     expect(chainToMarkdown(chain)).not.toContain('_Delivered_');
+  });
+
+  it('renders an image message with its alt text in brackets', () => {
+    const chain: IMessageChain = {
+      ...imessageDefaults,
+      messages: [{
+        id: '1', sender: 'me',
+        content: { type: 'image', image: { src: 'x', alt: 'a sunset' } },
+        timestamp: '',
+      }],
+    };
+    expect(chainToMarkdown(chain)).toContain('Me: [Image: a sunset]');
+  });
+
+  it('renders a video message with its duration in brackets', () => {
+    const chain: IMessageChain = {
+      ...imessageDefaults,
+      messages: [{
+        id: '1', sender: 'them',
+        content: { type: 'video', thumbnail: { src: 'x', alt: '' }, duration: '0:42' },
+        timestamp: '',
+      }],
+    };
+    expect(chainToMarkdown(chain)).toContain(`${imessageDefaults.contactName}: [Video (0:42)]`);
   });
 });

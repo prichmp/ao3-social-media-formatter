@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
-import { imessageSchema } from './schema';
+import { imessageSchema, messageContentSchema } from './schema';
 import { imessageDefaults } from './defaults';
 
 describe('imessageSchema', () => {
@@ -17,7 +17,7 @@ describe('imessageSchema', () => {
   it('rejects an unknown sender value', () => {
     const bad = {
       ...imessageDefaults,
-      messages: [{ id: '1', sender: 'bot', content: 'hi', timestamp: '' }],
+      messages: [{ id: '1', sender: 'bot', content: { type: 'text', text: 'hi' }, timestamp: '' }],
     };
     expect(() => imessageSchema.parse(bad)).toThrow(z.ZodError);
   });
@@ -33,5 +33,33 @@ describe('imessageSchema', () => {
   it('rejects a non-boolean showDeliveredOnLast', () => {
     const bad = { ...imessageDefaults, showDeliveredOnLast: 'yes' };
     expect(() => imessageSchema.parse(bad)).toThrow(z.ZodError);
+  });
+
+  it('rejects the legacy `content: string` shape', () => {
+    // Pre-refactor data carried `content` as a bare string. Reject so bad
+    // shapes don't sneak through.
+    const bad = {
+      ...imessageDefaults,
+      messages: [{ id: '1', sender: 'me', content: 'hi', timestamp: '' }],
+    };
+    expect(() => imessageSchema.parse(bad)).toThrow(z.ZodError);
+  });
+});
+
+describe('messageContentSchema', () => {
+  it('accepts every valid discriminator', () => {
+    expect(() => messageContentSchema.parse({ type: 'text', text: 'hi' })).not.toThrow();
+    expect(() => messageContentSchema.parse({ type: 'image', image: { src: '', alt: '' } })).not.toThrow();
+    expect(() => messageContentSchema.parse({ type: 'video', thumbnail: { src: '', alt: '' }, duration: '0:42' })).not.toThrow();
+  });
+
+  it('rejects an unknown content type', () => {
+    expect(() => messageContentSchema.parse({ type: 'gif', src: '' })).toThrow(z.ZodError);
+  });
+
+  it('rejects a missing required field per variant', () => {
+    expect(() => messageContentSchema.parse({ type: 'text' })).toThrow(z.ZodError);
+    expect(() => messageContentSchema.parse({ type: 'image' })).toThrow(z.ZodError);
+    expect(() => messageContentSchema.parse({ type: 'video', thumbnail: { src: '', alt: '' } })).toThrow(z.ZodError);
   });
 });

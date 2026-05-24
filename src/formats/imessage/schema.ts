@@ -3,7 +3,7 @@
 // throws (or, for localStorage, clears the bad value).
 
 import { z } from 'zod';
-import type { IMessage, IMessageChain } from './types';
+import type { IMessage, IMessageChain, MessageContent } from './types';
 
 const imageRefSchema = z.object({
   src: z.string(),
@@ -12,13 +12,19 @@ const imageRefSchema = z.object({
   height: z.number().optional(),
 });
 
+export const messageContentSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('text'),  text: z.string() }),
+  z.object({ type: z.literal('image'), image: imageRefSchema }),
+  z.object({ type: z.literal('video'), thumbnail: imageRefSchema, duration: z.string() }),
+]);
+
 export const imessageSchema = z.object({
   contactName: z.string(),
   contactAvatar: imageRefSchema,
   messages: z.array(z.object({
     id: z.string(),
     sender: z.enum(['me', 'them']),
-    content: z.string(),
+    content: messageContentSchema,
     timestamp: z.string(),
   })),
   showDeliveredOnLast: z.boolean(),
@@ -26,7 +32,8 @@ export const imessageSchema = z.object({
 
 // Static-shape sanity checks (won't run at runtime but fail to compile if
 // the schema drifts from the hand-written types).
+type _ContentMatches = z.infer<typeof messageContentSchema> extends MessageContent ? true : never;
 type _MessageMatches = z.infer<typeof imessageSchema>['messages'][number] extends IMessage ? true : never;
 type _ChainMatches = z.infer<typeof imessageSchema> extends IMessageChain ? true : never;
-const _checks: [_MessageMatches, _ChainMatches] = [true, true];
+const _checks: [_ContentMatches, _MessageMatches, _ChainMatches] = [true, true, true];
 void _checks;
