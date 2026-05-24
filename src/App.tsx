@@ -15,8 +15,9 @@ import { loadSaves, upsertSave, deleteSave } from './lib/saves';
 import type { NamedSave } from './lib/saves';
 import { UserListContext } from './lib/UserListContext';
 import type { TwitterPost } from './formats/twitter/types';
-import type { TwitterUser } from './formats/twitter/types';
-import { twitterPostSchema, twitterUserSchema } from './formats/twitter/schema';
+import { twitterPostSchema } from './formats/twitter/schema';
+import type { SavedUser } from './lib/savedUser';
+import { savedUserSchema } from './lib/savedUser';
 import type { IMessageChain } from './formats/imessage/types';
 import { imessageSchema } from './formats/imessage/schema';
 import { imessageDefaults } from './formats/imessage/defaults';
@@ -49,7 +50,7 @@ const appStateSchema = z.object({
   livestream: livestreamSchema,
   email:      emailSchema,
   tumblr:     tumblrSchema,
-  users: z.array(twitterUserSchema),
+  users: z.array(savedUserSchema),
   currentSaveId: z.string().nullable(),
   currentSaveName: z.string().nullable(),
 });
@@ -95,6 +96,15 @@ const importFileSchema = z.discriminatedUnion('format', [
   }),
 ]);
 
+// Schema for the file produced by handleExportUsers. `kind` and `version`
+// are optional so older exports still validate; only `users` is required.
+const userListImportSchema = z.object({
+  version: z.number().optional(),
+  kind: z.literal('user-list').optional(),
+  savedAt: z.string().optional(),
+  users: z.array(savedUserSchema),
+});
+
 interface AppState {
   activeFormat: FormatId;
   twitter: TwitterPost;
@@ -102,7 +112,7 @@ interface AppState {
   livestream: LivestreamSegment;
   email: EmailThread;
   tumblr: TumblrPost;
-  users: TwitterUser[];
+  users: SavedUser[];
   currentSaveId: string | null;
   currentSaveName: string | null;
 }
@@ -173,6 +183,17 @@ type ModalState =
 
 type ActiveData = TwitterPost | IMessageChain | LivestreamSegment | EmailThread | TumblrPost;
 
+// Trigger a browser download of `data` serialized as pretty JSON.
+function downloadJson(data: unknown, filename: string): void {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // Return the active format's data slot. Narrowed by `state.activeFormat`.
 function activeData(state: AppState): ActiveData {
   switch (state.activeFormat) {
@@ -211,6 +232,7 @@ export default function App() {
   const [saves, setSaves] = useState<NamedSave[]>([]);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const userFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     saveState(state);
@@ -412,13 +434,72 @@ export default function App() {
       state.activeFormat === 'livestream' ? { ...base, format: 'livestream' as const, livestream: state.livestream } :
       state.activeFormat === 'email'      ? { ...base, format: 'email'      as const, email:      state.email      } :
                                             { ...base, format: 'tumblr'     as const, tumblr:     state.tumblr     };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${state.currentSaveName ?? `ao3-${state.activeFormat}`}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadJson(data, `${state.currentSaveName ?? `ao3-${state.activeFormat}`}.json`);
+  }
+
+  function handleExportUsers() {
+    if (state.users.length === 0) {
+      alert('No saved users to export. Add a user from the Users panel first.');
+      return;
+    }
+    const data = {
+      version: 1,
+      kind: 'user-list' as const,
+      savedAt: new Date().toISOString(),
+      users: state.users,
+    };
+    downloadJson(data, 'ao3-user-list.json');
+  }
+
+  function handleImportUsersClick() {
+    userFileInputRef.current?.click();
+  }
+
+  function handleImportUsersFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    const reader = new FileReader();
+    reader.onload = evt => {
+      try {
+        const raw = JSON.parse(evt.target?.result as string);
+        const parsed = userListImportSchema.parse(raw);
+
+        // Append, skipping users whose name + handle + email all match an
+        // already-saved user. Keeps the panel from filling with duplicates
+        // when re-importing the same file. Imported ids are reassigned so
+        // they can't accidentally collide with anything local.
+        let added = 0;
+        let skipped = 0;
+        setState(s => {
+          const next = [...s.users];
+          for (const u of parsed.users) {
+            const isDup = next.some(existing =>
+              existing.name === u.name &&
+              existing.handle === u.handle &&
+              existing.email === u.email,
+            );
+            if (isDup) {
+              skipped++;
+              continue;
+            }
+            next.push({ ...u, id: crypto.randomUUID() });
+            added++;
+          }
+          return { ...s, users: next };
+        });
+        setUsersOpen(true);
+        alert(
+          skipped > 0
+            ? `Imported ${added} new user${added === 1 ? '' : 's'} (${skipped} already existed).`
+            : `Imported ${added} user${added === 1 ? '' : 's'}.`,
+        );
+      } catch (err) {
+        console.error('User list import failed:', err);
+        alert('Could not import user list. Make sure it is a valid file exported from this tool.');
+      }
+    };
+    reader.readAsText(file);
   }
 
   // ── Import ───────────────────────────────────────────────────────────────
@@ -482,10 +563,12 @@ export default function App() {
 
   const userListContext = {
     users: state.users,
-    addUser: (user: TwitterUser) => {
+    addUser: (user: SavedUser) => {
       setState(s => ({ ...s, users: [...s.users, user] }));
       setUsersOpen(true);
     },
+    updateUser: (user: SavedUser) =>
+      setState(s => ({ ...s, users: s.users.map(u => (u.id === user.id ? user : u)) })),
     removeUser: (id: string) => setState(s => ({ ...s, users: s.users.filter(u => u.id !== id) })),
   };
 
@@ -521,6 +604,13 @@ export default function App() {
         style={{ display: 'none' }}
         onChange={handleImportFile}
       />
+      <input
+        ref={userFileInputRef}
+        type="file"
+        accept=".json,application/json"
+        style={{ display: 'none' }}
+        onChange={handleImportUsersFile}
+      />
 
       <Layout
         header={
@@ -546,6 +636,8 @@ export default function App() {
                 { label: state.currentSaveName ? `Save "${state.currentSaveName}"` : 'Save', onClick: handleSave },
                 { label: 'Export', onClick: handleExport },
                 { label: 'Import', onClick: handleImportClick },
+                { label: 'Export user list', onClick: handleExportUsers },
+                { label: 'Import user list', onClick: handleImportUsersClick },
                 { label: 'Reset', onClick: handleReset, danger: true },
               ]}
             />

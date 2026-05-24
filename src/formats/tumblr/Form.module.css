@@ -105,6 +105,29 @@ details[open] .sectionTitle::before {
   gap: 8px;
 }
 
+.entryCardDropTarget {
+  outline: 2px dashed #00b8ff;
+  outline-offset: -2px;
+  background: #e0f6ff;
+}
+
+.addUserBtn {
+  align-self: flex-start;
+  padding: 4px 10px;
+  background: #e0f6ff;
+  color: #00608a;
+  border: 1px solid #00b8ff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-family: inherit;
+  transition: background 0.12s;
+}
+
+.addUserBtn:hover {
+  background: #b3e8ff;
+}
+
 .originalChip {
   align-self: flex-start;
   font-size: 0.7rem;

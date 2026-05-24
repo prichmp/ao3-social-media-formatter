@@ -9,7 +9,7 @@ export function threadToMarkdown(thread: EmailThread): string {
 
   if (subject || label) {
     const labelPart = label ? ` [${label}]` : '';
-    lines.push(`**${subject}**${labelPart}`.trim() || labelPart.trim());
+    lines.push(`${subject}${labelPart}`.trim() || labelPart.trim());
   }
 
   thread.messages.forEach((msg, i) => {
@@ -33,9 +33,9 @@ function messageHeader(msg: EmailMessage): string[] {
 
   if (name || email) {
     const emailPart = email ? ` <${email}>` : '';
-    out.push(`**${name || email}**${name ? emailPart : ''}`);
+    out.push(`${name || email}${name ? emailPart : ''}`);
   }
   if (recipients) out.push(`to ${recipients}`);
-  if (timestamp)  out.push(`_${timestamp}_`);
+  if (timestamp)  out.push(timestamp);
   return out;
 }

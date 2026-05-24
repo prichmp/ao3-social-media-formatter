@@ -7,7 +7,7 @@
 // rejected at the boundary so bad shapes can't sneak into app state.
 
 import { z } from 'zod';
-import type { TweetAttachment, TwitterPost, TwitterReply, TwitterUser } from './types';
+import type { TweetAttachment, TwitterPost, TwitterReply } from './types';
 
 const imageRefSchema = z.object({
   src: z.string(),
@@ -51,13 +51,6 @@ export const twitterReplySchema = z.object({
   showStats: z.boolean(),
 });
 
-export const twitterUserSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  handle: z.string(),
-  avatar: imageRefSchema,
-});
-
 export const twitterPostSchema = z.object({
   author: z.object({
     avatar: imageRefSchema,
@@ -81,9 +74,7 @@ export const twitterPostSchema = z.object({
 // these compile, the runtime parse() result lines up with the static types.
 type _AttachmentMatches = z.infer<typeof tweetAttachmentSchema> extends TweetAttachment ? true : never;
 type _ReplyMatches = z.infer<typeof twitterReplySchema> extends TwitterReply ? true : never;
-type _UserMatches = z.infer<typeof twitterUserSchema> extends TwitterUser ? true : never;
 type _PostMatches = z.infer<typeof twitterPostSchema> extends TwitterPost ? true : never;
-// Reference the aliases so the compiler keeps the check around.
-type _Checks = [_AttachmentMatches, _ReplyMatches, _UserMatches, _PostMatches];
-const _checks: _Checks = [true, true, true, true];
+type _Checks = [_AttachmentMatches, _ReplyMatches, _PostMatches];
+const _checks: _Checks = [true, true, true];
 void _checks;

@@ -11,6 +11,35 @@
   border-bottom: 1px solid #e0e0e0;
 }
 
+.sectionDropTarget {
+  outline: 2px dashed #9147ff;
+  outline-offset: -2px;
+  background: #f3edff;
+}
+
+.chatCardDropTarget {
+  outline: 2px dashed #9147ff;
+  outline-offset: -2px;
+  background: #f3edff;
+}
+
+.addUserBtn {
+  align-self: flex-start;
+  padding: 4px 10px;
+  background: #f3edff;
+  color: #9147ff;
+  border: 1px solid #9147ff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-family: inherit;
+  transition: background 0.12s;
+}
+
+.addUserBtn:hover {
+  background: #e0d2ff;
+}
+
 .sectionTitle {
   font-weight: 600;
   font-size: 0.95rem;

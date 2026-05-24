@@ -111,6 +111,8 @@ function ReplyCard({ reply, onChange, replyOptions }: {
       id: crypto.randomUUID(),
       name: reply.name,
       handle: reply.handle,
+      email: '',
+      color: '',
       avatar: reply.avatar,
     };
     addUser(user);
@@ -197,6 +199,8 @@ function QuoteFields({ attachment, onChange }: {
       id: crypto.randomUUID(),
       name: attachment.name,
       handle: attachment.handle,
+      email: '',
+      color: '',
       avatar: attachment.avatar,
     });
   }

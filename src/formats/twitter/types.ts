@@ -1,13 +1,9 @@
 import type { ImageRef } from '../types';
 
-export interface TwitterUser {
-  id: string;
-  name: string;
-  handle: string;
-  avatar: ImageRef;
-}
-
-export const TWITTER_USER_DRAG_TYPE = 'application/twitter-user';
+// SavedUser is the canonical shape; re-export here so legacy imports
+// (formats/twitter consumers) keep working while we migrate call sites.
+export type { SavedUser as TwitterUser } from '../../lib/savedUser';
+export { SAVED_USER_DRAG_TYPE as TWITTER_USER_DRAG_TYPE } from '../../lib/savedUser';
 
 // Discriminated union: a tweet (or reply) has exactly one attachment kind.
 // The 'text' case is the no-attachment default and carries no extra data.

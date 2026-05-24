@@ -10,10 +10,10 @@ export function segmentToMarkdown(segment: LivestreamSegment): string {
   const category = segment.category.trim();
   const viewers = segment.viewerCount.trim();
 
-  if (streamer) lines.push(`**${streamer}** is live`);
+  if (streamer) lines.push(`${streamer} is live`);
   if (title)    lines.push(title);
-  if (category) lines.push(`_Playing: ${category}_`);
-  if (viewers)  lines.push(`_${viewers} viewers_`);
+  if (category) lines.push(`Playing: ${category}`);
+  if (viewers)  lines.push(`${viewers} viewers`);
 
   if (segment.chat.length > 0) {
     lines.push('', '---', '');
@@ -29,5 +29,5 @@ function chatToMarkdown(msg: ChatMessage): string {
   const badges = msg.badges.length > 0 ? `[${msg.badges.join('/')}] ` : '';
   const user = msg.username || 'anonymous';
   const body = msg.content.trim();
-  return `${badges}**${user}**: ${body}`;
+  return `${badges}${user}: ${body}`;
 }

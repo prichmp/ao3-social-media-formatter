@@ -1,9 +1,10 @@
 import { createContext, useContext } from 'react';
-import type { TwitterUser } from '../formats/twitter/types';
+import type { SavedUser } from './savedUser';
 
 interface UserListContextValue {
-  users: TwitterUser[];
-  addUser: (user: TwitterUser) => void;
+  users: SavedUser[];
+  addUser: (user: SavedUser) => void;
+  updateUser: (user: SavedUser) => void;
   removeUser: (id: string) => void;
 }
 

@@ -110,6 +110,29 @@ details[open] .sectionTitle::before {
   gap: 8px;
 }
 
+.messageCardDropTarget {
+  outline: 2px dashed #1A73E8;
+  outline-offset: -2px;
+  background: #e8f1ff;
+}
+
+.addUserBtn {
+  align-self: flex-start;
+  padding: 4px 10px;
+  background: #e8f1ff;
+  color: #1A73E8;
+  border: 1px solid #1A73E8;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-family: inherit;
+  transition: background 0.12s;
+}
+
+.addUserBtn:hover {
+  background: #d0e3ff;
+}
+
 .colorRow {
   display: flex;
   gap: 6px;

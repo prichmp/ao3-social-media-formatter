@@ -3,6 +3,9 @@ import type { TumblrEntry, TumblrPost } from './types';
 import type { ImageRef } from '../types';
 import { ImageInput } from '../../components/ImageInput';
 import { RepeatableList } from '../../components/RepeatableList';
+import { SAVED_USER_DRAG_TYPE, type SavedUser } from '../../lib/savedUser';
+import { useDropTarget } from '../../lib/useDropTarget';
+import { useUserList } from '../../lib/UserListContext';
 import styles from './Form.module.css';
 
 interface Props {
@@ -82,6 +85,7 @@ function EntryCard({ entry, isOriginal, onChange }: {
   isOriginal: boolean;
   onChange: (e: TumblrEntry) => void;
 }) {
+  const { users, addUser } = useUserList();
   const set = <K extends keyof TumblrEntry>(k: K, v: TumblrEntry[K]) =>
     onChange({ ...entry, [k]: v });
   const setAvatar = (v: ImageRef) => set('avatar', v);
@@ -98,8 +102,44 @@ function EntryCard({ entry, isOriginal, onChange }: {
     set('tags', parts);
   }
 
+  function handleDrop(data: string) {
+    try {
+      const user = JSON.parse(data) as SavedUser;
+      onChange({
+        ...entry,
+        username: user.handle || user.name || entry.username,
+        avatar: { ...user.avatar },
+      });
+    } catch { /* ignore */ }
+  }
+
+  // Tumblr usernames live in `handle` on a SavedUser.
+  const canAddToList =
+    entry.username.trim() !== '' &&
+    !users.some(u => u.handle === entry.username);
+
+  function handleAddToUserList() {
+    const user: SavedUser = {
+      id: crypto.randomUUID(),
+      name: '',
+      handle: entry.username,
+      email: '',
+      color: '',
+      avatar: entry.avatar,
+    };
+    addUser(user);
+  }
+
+  const drop = useDropTarget(SAVED_USER_DRAG_TYPE, handleDrop);
+
   return (
-    <div className={styles.entryCard}>
+    <div
+      className={`${styles.entryCard}${drop.isDragOver ? ` ${styles.entryCardDropTarget}` : ''}`}
+      onDragEnter={drop.onDragEnter}
+      onDragOver={drop.onDragOver}
+      onDragLeave={drop.onDragLeave}
+      onDrop={drop.onDrop}
+    >
       {isOriginal && <span className={styles.originalChip}>Original post</span>}
       <Field label="Username">
         <TextInput value={entry.username} onChange={v => set('username', v)} placeholder="best-friend-squad" />
@@ -130,6 +170,11 @@ function EntryCard({ entry, isOriginal, onChange }: {
           placeholder="adoradiscourse, long post, sword lesbians"
         />
       </Field>
+      {canAddToList && (
+        <button type="button" className={styles.addUserBtn} onClick={handleAddToUserList}>
+          + Add to user list
+        </button>
+      )}
     </div>
   );
 }
@@ -137,6 +182,23 @@ function EntryCard({ entry, isOriginal, onChange }: {
 export function TumblrForm({ state, onChange }: Props) {
   const set = <K extends keyof TumblrPost>(k: K, v: TumblrPost[K]) =>
     onChange({ ...state, [k]: v });
+
+  function handleEntryListDrop(data: string, index: number) {
+    try {
+      const user = JSON.parse(data) as SavedUser;
+      const newEntry: TumblrEntry = {
+        id: crypto.randomUUID(),
+        username: user.handle || user.name,
+        avatar: { ...user.avatar },
+        content: '',
+        image: { src: '', alt: '' },
+        tags: [],
+      };
+      const next = [...state.entries];
+      next.splice(index, 0, newEntry);
+      set('entries', next);
+    } catch { /* ignore */ }
+  }
 
   return (
     <div className={styles.form}>
@@ -148,6 +210,8 @@ export function TumblrForm({ state, onChange }: Props) {
           onAdd={() => set('entries', [...state.entries, makeEntry()])}
           onRemove={id => set('entries', state.entries.filter(e => e.id !== id))}
           addLabel="Add reblog"
+          externalDragType={SAVED_USER_DRAG_TYPE}
+          onExternalDrop={handleEntryListDrop}
           renderItem={(entry, onItemChange) => (
             <EntryCard
               key={entry.id}

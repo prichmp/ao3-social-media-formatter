@@ -10,10 +10,10 @@ describe('threadToMarkdown', () => {
     expect(md.split('\n')[0]).toContain(`[${emailDefaults.label}]`);
   });
 
-  it('includes a bold sender for each message', () => {
+  it('includes the sender for each message', () => {
     const md = threadToMarkdown(emailDefaults);
     for (const msg of emailDefaults.messages) {
-      expect(md).toContain(`**${msg.senderName}**`);
+      expect(md).toContain(msg.senderName);
     }
   });
 
@@ -24,10 +24,10 @@ describe('threadToMarkdown', () => {
     }
   });
 
-  it('renders an italic timestamp for each message', () => {
+  it('renders the timestamp for each message', () => {
     const md = threadToMarkdown(emailDefaults);
     for (const msg of emailDefaults.messages) {
-      expect(md).toContain(`_${msg.timestamp}_`);
+      expect(md).toContain(msg.timestamp);
     }
   });
 

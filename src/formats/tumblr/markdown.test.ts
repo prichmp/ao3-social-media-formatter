@@ -4,9 +4,9 @@ import { tumblrDefaults } from './defaults';
 import type { TumblrPost } from './types';
 
 describe('postToMarkdown', () => {
-  it('opens with the original poster as a bold username', () => {
+  it('opens with the original poster username', () => {
     const md = postToMarkdown(tumblrDefaults);
-    expect(md.split('\n')[0]).toBe(`**${tumblrDefaults.entries[0].username}**`);
+    expect(md.split('\n')[0]).toBe(tumblrDefaults.entries[0].username);
   });
 
   it('separates entries with a horizontal rule', () => {
@@ -17,7 +17,7 @@ describe('postToMarkdown', () => {
 
   it('emits a "reblogged this" line for silent reblogs', () => {
     const md = postToMarkdown(tumblrDefaults);
-    expect(md).toContain('**cherrybonfire-official** reblogged this');
+    expect(md).toContain('cherrybonfire-official reblogged this');
   });
 
   it('formats tags as space-separated #tags on their own line', () => {
@@ -27,7 +27,7 @@ describe('postToMarkdown', () => {
 
   it('renders the footer with notes count + timestamp', () => {
     const md = postToMarkdown(tumblrDefaults);
-    expect(md).toContain(`**${tumblrDefaults.notes}** · _${tumblrDefaults.timestamp}_`);
+    expect(md).toContain(`${tumblrDefaults.notes} · ${tumblrDefaults.timestamp}`);
   });
 
   it('omits the footer line when both notes and timestamp are empty', () => {

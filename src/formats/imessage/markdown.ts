@@ -12,7 +12,7 @@ export function chainToMarkdown(chain: IMessageChain): string {
 
   for (const msg of chain.messages) {
     if (msg.timestamp.trim() !== '') {
-      lines.push('', `_${msg.timestamp.trim()}_`);
+      lines.push('', msg.timestamp.trim());
     }
     const speaker = msg.sender === 'me' ? 'Me' : name || 'Them';
     const body = contentToMarkdown(msg.content);
@@ -22,7 +22,7 @@ export function chainToMarkdown(chain: IMessageChain): string {
   }
 
   if (chain.showDeliveredOnLast && hasMe(chain)) {
-    lines.push('', '_Delivered_');
+    lines.push('', 'Delivered');
   }
 
   return lines.join('\n').trim();

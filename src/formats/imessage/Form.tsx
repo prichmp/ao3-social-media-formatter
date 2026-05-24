@@ -10,6 +10,8 @@ import { defaultMessageContent } from './types';
 import type { ImageRef } from '../types';
 import { ImageInput } from '../../components/ImageInput';
 import { RepeatableList } from '../../components/RepeatableList';
+import { SAVED_USER_DRAG_TYPE, type SavedUser } from '../../lib/savedUser';
+import { useDropTarget } from '../../lib/useDropTarget';
 import styles from './Form.module.css';
 
 interface Props {
@@ -17,13 +19,23 @@ interface Props {
   onChange: (s: IMessageChain) => void;
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children, externalDragType, onExternalDrop }: {
+  title: string;
+  children: React.ReactNode;
+  externalDragType?: string;
+  onExternalDrop?: (data: string) => void;
+}) {
   const [open, setOpen] = useState(true);
+  const drop = useDropTarget(externalDragType, onExternalDrop);
   return (
     <details
-      className={styles.section}
+      className={`${styles.section}${drop.isDragOver ? ` ${styles.sectionDropTarget}` : ''}`}
       open={open}
       onToggle={e => setOpen((e.currentTarget as HTMLDetailsElement).open)}
+      onDragEnter={drop.onDragEnter}
+      onDragOver={drop.onDragOver}
+      onDragLeave={drop.onDragLeave}
+      onDrop={drop.onDrop}
     >
       <summary className={styles.sectionTitle}>{title}</summary>
       <div className={styles.sectionBody}>{children}</div>
@@ -178,9 +190,26 @@ export function IMessageForm({ state, onChange }: Props) {
     onChange({ ...state, [k]: v });
   const setAvatar = (v: ImageRef) => set('contactAvatar', v);
 
+  function handleContactDrop(data: string) {
+    try {
+      const user = JSON.parse(data) as SavedUser;
+      onChange({
+        ...state,
+        contactName: user.name || user.handle || state.contactName,
+        contactAvatar: { ...user.avatar },
+      });
+    } catch {
+      // ignore malformed drag data
+    }
+  }
+
   return (
     <div className={styles.form}>
-      <Section title="Contact">
+      <Section
+        title="Contact"
+        externalDragType={SAVED_USER_DRAG_TYPE}
+        onExternalDrop={handleContactDrop}
+      >
         <Field label="Contact name">
           <TextInput value={state.contactName} onChange={v => set('contactName', v)} />
         </Field>

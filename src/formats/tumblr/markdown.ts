@@ -13,8 +13,8 @@ export function postToMarkdown(post: TumblrPost): string {
   if (post.notes.trim() || post.timestamp.trim()) {
     lines.push('');
     const parts: string[] = [];
-    if (post.notes.trim())     parts.push(`**${post.notes.trim()}**`);
-    if (post.timestamp.trim()) parts.push(`_${post.timestamp.trim()}_`);
+    if (post.notes.trim())     parts.push(post.notes.trim());
+    if (post.timestamp.trim()) parts.push(post.timestamp.trim());
     lines.push(parts.join(' · '));
   }
 
@@ -30,11 +30,11 @@ function entryToMarkdown(entry: TumblrEntry, isOriginal: boolean): string[] {
   const isSilent = !isOriginal && content === '' && !hasImage && tags.length === 0;
 
   if (isSilent) {
-    out.push(`**${username || 'anonymous'}** reblogged this`);
+    out.push(`${username || 'anonymous'} reblogged this`);
     return out;
   }
 
-  out.push(`**${username || 'anonymous'}**`);
+  out.push(username || 'anonymous');
   if (content) {
     out.push('');
     out.push(content);

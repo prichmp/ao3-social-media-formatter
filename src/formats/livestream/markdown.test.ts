@@ -6,21 +6,21 @@ import type { LivestreamSegment } from './types';
 describe('segmentToMarkdown', () => {
   it('opens with the streamer-is-live line', () => {
     expect(segmentToMarkdown(livestreamDefaults).split('\n')[0])
-      .toBe(`**${livestreamDefaults.streamer.name}** is live`);
+      .toBe(`${livestreamDefaults.streamer.name} is live`);
   });
 
-  it('renders the title, category, and viewer count as italic lines', () => {
+  it('renders the title, category, and viewer count as plain lines', () => {
     const md = segmentToMarkdown(livestreamDefaults);
     expect(md).toContain(livestreamDefaults.title);
-    expect(md).toContain(`_Playing: ${livestreamDefaults.category}_`);
-    expect(md).toContain(`_${livestreamDefaults.viewerCount} viewers_`);
+    expect(md).toContain(`Playing: ${livestreamDefaults.category}`);
+    expect(md).toContain(`${livestreamDefaults.viewerCount} viewers`);
   });
 
   it('separates the header from chat with a horizontal rule', () => {
     expect(segmentToMarkdown(livestreamDefaults)).toContain('\n---\n');
   });
 
-  it('formats each chat message with badges + bold username + body', () => {
+  it('formats each chat message with badges + username + body', () => {
     const segment: LivestreamSegment = {
       ...livestreamDefaults,
       chat: [{
@@ -28,7 +28,7 @@ describe('segmentToMarkdown', () => {
         badges: ['mod', 'subscriber'], content: 'kekw',
       }],
     };
-    expect(segmentToMarkdown(segment)).toContain('[mod/subscriber] **mossy**: kekw');
+    expect(segmentToMarkdown(segment)).toContain('[mod/subscriber] mossy: kekw');
   });
 
   it('omits the chat section when there are no messages', () => {

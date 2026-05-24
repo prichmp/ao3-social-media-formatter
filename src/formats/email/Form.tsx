@@ -3,6 +3,9 @@ import type { EmailMessage, EmailThread } from './types';
 import type { ImageRef } from '../types';
 import { ImageInput } from '../../components/ImageInput';
 import { RepeatableList } from '../../components/RepeatableList';
+import { SAVED_USER_DRAG_TYPE, type SavedUser } from '../../lib/savedUser';
+import { useDropTarget } from '../../lib/useDropTarget';
+import { useUserList } from '../../lib/UserListContext';
 import styles from './Form.module.css';
 
 interface Props {
@@ -83,12 +86,52 @@ function MessageCard({ message, onChange }: {
   message: EmailMessage;
   onChange: (m: EmailMessage) => void;
 }) {
+  const { users, addUser } = useUserList();
   const set = <K extends keyof EmailMessage>(k: K, v: EmailMessage[K]) =>
     onChange({ ...message, [k]: v });
   const setAvatar = (v: ImageRef) => set('senderAvatar', v);
 
+  function handleDrop(data: string) {
+    try {
+      const user = JSON.parse(data) as SavedUser;
+      onChange({
+        ...message,
+        senderName: user.name || user.handle || message.senderName,
+        senderEmail: user.email || message.senderEmail,
+        senderAvatar: { ...user.avatar },
+        senderColor: user.color || message.senderColor,
+      });
+    } catch { /* ignore */ }
+  }
+
+  // Enable the button once we have at least one identifying field, and only
+  // if a user with this exact name+email isn't already saved.
+  const canAddToList =
+    (message.senderName.trim() !== '' || message.senderEmail.trim() !== '') &&
+    !users.some(u => u.name === message.senderName && u.email === message.senderEmail);
+
+  function handleAddToUserList() {
+    const user: SavedUser = {
+      id: crypto.randomUUID(),
+      name: message.senderName,
+      handle: '',
+      email: message.senderEmail,
+      color: message.senderColor,
+      avatar: message.senderAvatar,
+    };
+    addUser(user);
+  }
+
+  const drop = useDropTarget(SAVED_USER_DRAG_TYPE, handleDrop);
+
   return (
-    <div className={styles.messageCard}>
+    <div
+      className={`${styles.messageCard}${drop.isDragOver ? ` ${styles.messageCardDropTarget}` : ''}`}
+      onDragEnter={drop.onDragEnter}
+      onDragOver={drop.onDragOver}
+      onDragLeave={drop.onDragLeave}
+      onDrop={drop.onDrop}
+    >
       <Field label="Sender name">
         <TextInput value={message.senderName} onChange={v => set('senderName', v)} />
       </Field>
@@ -133,6 +176,11 @@ function MessageCard({ message, onChange }: {
       <Field label="Body">
         <TextArea value={message.body} onChange={v => set('body', v)} />
       </Field>
+      {canAddToList && (
+        <button type="button" className={styles.addUserBtn} onClick={handleAddToUserList}>
+          + Add to user list
+        </button>
+      )}
     </div>
   );
 }
@@ -140,6 +188,25 @@ function MessageCard({ message, onChange }: {
 export function EmailForm({ state, onChange }: Props) {
   const set = <K extends keyof EmailThread>(k: K, v: EmailThread[K]) =>
     onChange({ ...state, [k]: v });
+
+  function handleMessageListDrop(data: string, index: number) {
+    try {
+      const user = JSON.parse(data) as SavedUser;
+      const newMessage: EmailMessage = {
+        id: crypto.randomUUID(),
+        senderName: user.name || user.handle,
+        senderEmail: user.email,
+        senderAvatar: { ...user.avatar },
+        senderColor: user.color || '#1A73E8',
+        recipients: 'me',
+        timestamp: '',
+        body: '',
+      };
+      const next = [...state.messages];
+      next.splice(index, 0, newMessage);
+      set('messages', next);
+    } catch { /* ignore */ }
+  }
 
   return (
     <div className={styles.form}>
@@ -160,6 +227,8 @@ export function EmailForm({ state, onChange }: Props) {
           onAdd={() => set('messages', [...state.messages, makeMessage()])}
           onRemove={id => set('messages', state.messages.filter(m => m.id !== id))}
           addLabel="Add message"
+          externalDragType={SAVED_USER_DRAG_TYPE}
+          onExternalDrop={handleMessageListDrop}
           renderItem={(message, onItemChange) => (
             <MessageCard
               key={message.id}

@@ -24,21 +24,21 @@ describe('chainToMarkdown', () => {
     expect(md).toContain(`${chain.contactName}: hi`);
   });
 
-  it('inserts italic timestamp lines when a message has one', () => {
+  it('inserts a timestamp line when a message has one', () => {
     const chain: IMessageChain = {
       ...imessageDefaults,
       messages: [{ id: '1', sender: 'me', content: text('hello'), timestamp: 'Today 10:32 AM' }],
     };
-    expect(chainToMarkdown(chain)).toContain('_Today 10:32 AM_');
+    expect(chainToMarkdown(chain)).toContain('Today 10:32 AM');
   });
 
   it('appends a Delivered marker when the flag is set and any "me" message exists', () => {
-    expect(chainToMarkdown(imessageDefaults)).toMatch(/_Delivered_$/);
+    expect(chainToMarkdown(imessageDefaults)).toMatch(/Delivered$/);
   });
 
   it('omits Delivered when the flag is off', () => {
     const chain: IMessageChain = { ...imessageDefaults, showDeliveredOnLast: false };
-    expect(chainToMarkdown(chain)).not.toContain('_Delivered_');
+    expect(chainToMarkdown(chain)).not.toContain('Delivered');
   });
 
   it('omits Delivered when there are no "me" messages even if the flag is on', () => {
@@ -47,7 +47,7 @@ describe('chainToMarkdown', () => {
       messages: imessageDefaults.messages.filter(m => m.sender !== 'me'),
       showDeliveredOnLast: true,
     };
-    expect(chainToMarkdown(chain)).not.toContain('_Delivered_');
+    expect(chainToMarkdown(chain)).not.toContain('Delivered');
   });
 
   it('renders an image message with its alt text in brackets', () => {

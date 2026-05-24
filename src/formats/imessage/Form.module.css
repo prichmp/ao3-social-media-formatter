@@ -11,6 +11,12 @@
   border-bottom: 1px solid #e0e0e0;
 }
 
+.sectionDropTarget {
+  outline: 2px dashed #1982FC;
+  outline-offset: -2px;
+  background: #e8f4fd;
+}
+
 .sectionTitle {
   font-weight: 600;
   font-size: 0.95rem;
