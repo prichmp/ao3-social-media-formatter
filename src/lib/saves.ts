@@ -8,9 +8,11 @@ import { z } from 'zod';
 import { twitterPostSchema } from '../formats/twitter/schema';
 import { imessageSchema } from '../formats/imessage/schema';
 import { livestreamSchema } from '../formats/livestream/schema';
+import { emailSchema } from '../formats/email/schema';
 import type { TwitterPost } from '../formats/twitter/types';
 import type { IMessageChain } from '../formats/imessage/types';
 import type { LivestreamSegment } from '../formats/livestream/types';
+import type { EmailThread } from '../formats/email/types';
 
 const KEY = 'ao3-formatter-saves';
 
@@ -23,7 +25,8 @@ interface NamedSaveBase {
 export type NamedSave =
   | (NamedSaveBase & { format: 'twitter';    twitter:    TwitterPost })
   | (NamedSaveBase & { format: 'imessage';   imessage:   IMessageChain })
-  | (NamedSaveBase & { format: 'livestream'; livestream: LivestreamSegment });
+  | (NamedSaveBase & { format: 'livestream'; livestream: LivestreamSegment })
+  | (NamedSaveBase & { format: 'email';      email:      EmailThread });
 
 const baseFields = {
   id: z.string(),
@@ -35,6 +38,7 @@ export const namedSaveSchema = z.discriminatedUnion('format', [
   z.object({ ...baseFields, format: z.literal('twitter'),    twitter:    twitterPostSchema }),
   z.object({ ...baseFields, format: z.literal('imessage'),   imessage:   imessageSchema }),
   z.object({ ...baseFields, format: z.literal('livestream'), livestream: livestreamSchema }),
+  z.object({ ...baseFields, format: z.literal('email'),      email:      emailSchema }),
 ]);
 
 const namedSaveListSchema = z.array(namedSaveSchema);

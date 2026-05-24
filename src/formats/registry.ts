@@ -14,6 +14,9 @@ import { renderChainImage } from './imessage/canvas/renderChainImage';
 import { livestreamDefaults } from './livestream/defaults';
 import { LivestreamForm } from './livestream/Form';
 import { renderSegmentImage } from './livestream/canvas/renderSegmentImage';
+import { emailDefaults } from './email/defaults';
+import { EmailForm } from './email/Form';
+import { renderThreadImage } from './email/canvas/renderThreadImage';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const formats: FormatDefinition<any>[] = [
@@ -37,6 +40,13 @@ export const formats: FormatDefinition<any>[] = [
     defaults: livestreamDefaults,
     Form: LivestreamForm,
     renderImage: (canvas, state) => renderSegmentImage(canvas, state),
+  },
+  {
+    id: 'email',
+    label: 'Email',
+    defaults: emailDefaults,
+    Form: EmailForm,
+    renderImage: (canvas, state) => renderThreadImage(canvas, state),
   },
 ];
 
