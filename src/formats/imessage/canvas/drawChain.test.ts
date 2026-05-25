@@ -45,8 +45,8 @@ describe('layoutChain', () => {
     const chain: IMessageChain = {
       ...imessageDefaults,
       messages: [
-        { id: '1', sender: 'them', content: text('hi'),      timestamp: '' },
-        { id: '2', sender: 'me',   content: text('hi back'), timestamp: '' },
+        { id: '1', sender: 'them', senderName: '', senderAvatar: { src: '', alt: '' }, content: text('hi'),      timestamp: '' },
+        { id: '2', sender: 'me', senderName: '', senderAvatar: { src: '', alt: '' },   content: text('hi back'), timestamp: '' },
       ],
     };
     const result = layout(chain);
@@ -63,8 +63,8 @@ describe('layoutChain', () => {
     const chain: IMessageChain = {
       ...imessageDefaults,
       messages: [
-        { id: '1', sender: 'them', content: text('hi'),      timestamp: '' },
-        { id: '2', sender: 'me',   content: text('hi back'), timestamp: '' },
+        { id: '1', sender: 'them', senderName: '', senderAvatar: { src: '', alt: '' }, content: text('hi'),      timestamp: '' },
+        { id: '2', sender: 'me', senderName: '', senderAvatar: { src: '', alt: '' },   content: text('hi back'), timestamp: '' },
       ],
       showDeliveredOnLast: true,
     };
@@ -82,7 +82,7 @@ describe('layoutChain', () => {
   it('renders timestamp labels as centered text', () => {
     const chain: IMessageChain = {
       ...imessageDefaults,
-      messages: [{ id: '1', sender: 'them', content: text('hi'), timestamp: 'Today 9:00 AM' }],
+      messages: [{ id: '1', sender: 'them', senderName: '', senderAvatar: { src: '', alt: '' }, content: text('hi'), timestamp: 'Today 9:00 AM' }],
     };
     const result = layout(chain);
     const ts = result.prims.find(p => p.t === 'text' && p.text === 'Today 9:00 AM');
@@ -107,7 +107,7 @@ describe('layoutChain', () => {
       ...imessageDefaults,
       messages: [{
         id: '1',
-        sender: 'me',
+        sender: 'me', senderName: '', senderAvatar: { src: '', alt: '' },
         content: { type: 'image', image: { src: 'x', alt: '' } },
         timestamp: '',
       }],
@@ -126,7 +126,7 @@ describe('layoutChain', () => {
       ...imessageDefaults,
       messages: [{
         id: '1',
-        sender: 'me',
+        sender: 'me', senderName: '', senderAvatar: { src: '', alt: '' },
         content: { type: 'image', image: { src: 'x', alt: '' } },
         timestamp: '',
       }],
@@ -145,7 +145,7 @@ describe('layoutChain', () => {
       ...imessageDefaults,
       messages: [{
         id: '1',
-        sender: 'them',
+        sender: 'them', senderName: '', senderAvatar: { src: '', alt: '' },
         content: { type: 'video', thumbnail: { src: 'x', alt: '' }, duration: '0:42' },
         timestamp: '',
       }],
@@ -160,7 +160,7 @@ describe('layoutChain', () => {
       ...imessageDefaults,
       messages: [{
         id: '1',
-        sender: 'them',
+        sender: 'them', senderName: '', senderAvatar: { src: '', alt: '' },
         content: { type: 'video', thumbnail: { src: 'x', alt: '' }, duration: '0:42' },
         timestamp: '',
       }],
@@ -168,5 +168,77 @@ describe('layoutChain', () => {
     };
     const result = layout(chain);
     expect(result.prims.some(p => p.t === 'text' && p.text === '0:42')).toBe(true);
+  });
+
+  it('group mode: indents "them" bubbles right to leave room for the avatar column', () => {
+    const noGroup = layout({
+      ...imessageDefaults,
+      messages: [
+        { id: '1', sender: 'them', senderName: '',     senderAvatar: { src: '',  alt: '' }, content: text('hi'), timestamp: '' },
+      ],
+    });
+    const group = layout({
+      ...imessageDefaults,
+      messages: [
+        { id: '1', sender: 'them', senderName: 'Alice', senderAvatar: { src: '', alt: '' }, content: text('hi'), timestamp: '' },
+      ],
+    });
+    const noGroupBubble = noGroup.prims.find(p => p.t === 'rect' && p.radius === theme.bubbleRadius);
+    const groupBubble   = group.prims.find(p => p.t === 'rect' && p.radius === theme.bubbleRadius);
+    expect(noGroupBubble).toBeDefined();
+    expect(groupBubble).toBeDefined();
+    if (noGroupBubble && noGroupBubble.t === 'rect' && groupBubble && groupBubble.t === 'rect') {
+      expect(groupBubble.x).toBe(noGroupBubble.x + theme.groupAvatarSize + theme.groupAvatarGap);
+    }
+  });
+
+  it('group mode: renders the sender name above the first "them" message of a burst', () => {
+    const chain: IMessageChain = {
+      ...imessageDefaults,
+      messages: [
+        { id: '1', sender: 'them', senderName: 'Alice', senderAvatar: { src: '', alt: '' }, content: text('one'),   timestamp: '' },
+        { id: '2', sender: 'them', senderName: 'Alice', senderAvatar: { src: '', alt: '' }, content: text('two'),   timestamp: '' },
+        { id: '3', sender: 'them', senderName: 'Bob',   senderAvatar: { src: '', alt: '' }, content: text('three'), timestamp: '' },
+      ],
+    };
+    const result = layout(chain);
+    // Alice is the start of one burst; Bob is the start of another. Two name labels.
+    const aliceCount = result.prims.filter(p => p.t === 'text' && p.text === 'Alice').length;
+    const bobCount   = result.prims.filter(p => p.t === 'text' && p.text === 'Bob').length;
+    expect(aliceCount).toBe(1);
+    expect(bobCount).toBe(1);
+  });
+
+  it('group mode: draws an avatar prim next to the last "them" message of a burst (when set)', () => {
+    const chain: IMessageChain = {
+      ...imessageDefaults,
+      messages: [
+        { id: '1', sender: 'them', senderName: 'Alice', senderAvatar: { src: 'https://a/avatar.png', alt: '' }, content: text('one'), timestamp: '' },
+        { id: '2', sender: 'them', senderName: 'Alice', senderAvatar: { src: 'https://a/avatar.png', alt: '' }, content: text('two'), timestamp: '' },
+      ],
+    };
+    const result = layout(chain);
+    // The contact-avatar circle in the header is also a circle, so filter
+    // for the small group-avatar size.
+    const groupAvatars = result.prims.filter(p =>
+      p.t === 'image' && p.circle && p.w === theme.groupAvatarSize,
+    );
+    // Two messages in one burst → one avatar (only on the last).
+    expect(groupAvatars.length).toBe(1);
+  });
+
+  it('non-group mode: no sender-name label or per-message avatar appears', () => {
+    const chain: IMessageChain = {
+      ...imessageDefaults,
+      messages: [
+        { id: '1', sender: 'them', senderName: '', senderAvatar: { src: '', alt: '' }, content: text('hi'), timestamp: '' },
+        { id: '2', sender: 'them', senderName: '', senderAvatar: { src: '', alt: '' }, content: text('again'), timestamp: '' },
+      ],
+    };
+    const result = layout(chain);
+    const groupAvatars = result.prims.filter(p =>
+      p.t === 'image' && p.circle && p.w === theme.groupAvatarSize,
+    );
+    expect(groupAvatars.length).toBe(0);
   });
 });

@@ -16,6 +16,15 @@ export type MessageContentType = MessageContent['type'];
 export interface IMessage {
   id: string;
   sender: MessageSender;
+  /**
+   * Per-message sender info for group chats. Only meaningful when
+   * `sender === 'them'`. `senderName` is drawn above the first message in
+   * a burst from that sender; `senderAvatar` is drawn next to the last
+   * message in the burst. Empty values fall back to single-person mode
+   * (no name / no avatar slot reserved).
+   */
+  senderName: string;
+  senderAvatar: ImageRef;
   content: MessageContent;
   /**
    * Optional gray timestamp line drawn above this message (e.g.

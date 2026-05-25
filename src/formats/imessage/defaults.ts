@@ -12,6 +12,8 @@ export const imessageDefaults: IMessageChain = {
       {
         "id": "cc9162a0-2a4d-4677-b900-7bc185dff7c2",
         "sender": "me",
+        "senderName": "",
+        "senderAvatar": { "src": "", "alt": "" },
         "content": {
           "type": "text",
           "text": "Did you just see that?"
@@ -21,6 +23,8 @@ export const imessageDefaults: IMessageChain = {
       {
         "id": "1e2e0091-4fee-487e-918c-94afe9aa2ff5",
         "sender": "me",
+        "senderName": "",
+        "senderAvatar": { "src": "", "alt": "" },
         "content": {
           "type": "text",
           "text": "I think Lena just kissed my sister!!!"
@@ -30,6 +34,8 @@ export const imessageDefaults: IMessageChain = {
       {
         "id": "ace1c9ea-8443-4f62-a7ac-d86cfc71513a",
         "sender": "them",
+        "senderName": "",
+        "senderAvatar": { "src": "", "alt": "" },
         "content": {
           "type": "text",
           "text": "Who do you think wolf-whistled at them"
@@ -39,6 +45,8 @@ export const imessageDefaults: IMessageChain = {
       {
         "id": "8eada542-7aae-4cfc-ae2c-cf7cd0a84454",
         "sender": "me",
+        "senderName": "",
+        "senderAvatar": { "src": "", "alt": "" },
         "content": {
           "type": "text",
           "text": "But"
@@ -48,6 +56,8 @@ export const imessageDefaults: IMessageChain = {
       {
         "id": "8205d941-f748-41ac-978b-de59d7a039ee",
         "sender": "them",
+        "senderName": "",
+        "senderAvatar": { "src": "", "alt": "" },
         "content": {
           "type": "text",
           "text": "The only but I want you worrying about is mine"

@@ -15,8 +15,8 @@ describe('chainToMarkdown', () => {
     const chain: IMessageChain = {
       ...imessageDefaults,
       messages: [
-        { id: '1', sender: 'me',   content: text('hello'), timestamp: '' },
-        { id: '2', sender: 'them', content: text('hi'),    timestamp: '' },
+        { id: '1', sender: 'me', senderName: '', senderAvatar: { src: '', alt: '' },   content: text('hello'), timestamp: '' },
+        { id: '2', sender: 'them', senderName: '', senderAvatar: { src: '', alt: '' }, content: text('hi'),    timestamp: '' },
       ],
     };
     const md = chainToMarkdown(chain);
@@ -27,7 +27,7 @@ describe('chainToMarkdown', () => {
   it('inserts a timestamp line when a message has one', () => {
     const chain: IMessageChain = {
       ...imessageDefaults,
-      messages: [{ id: '1', sender: 'me', content: text('hello'), timestamp: 'Today 10:32 AM' }],
+      messages: [{ id: '1', sender: 'me', senderName: '', senderAvatar: { src: '', alt: '' }, content: text('hello'), timestamp: 'Today 10:32 AM' }],
     };
     expect(chainToMarkdown(chain)).toContain('Today 10:32 AM');
   });
@@ -35,7 +35,7 @@ describe('chainToMarkdown', () => {
   it('appends a Delivered marker when the flag is set and any "me" message exists', () => {
     const chain: IMessageChain = {
       ...imessageDefaults,
-      messages: [{ id: '1', sender: 'me', content: text('hi'), timestamp: '' }],
+      messages: [{ id: '1', sender: 'me', senderName: '', senderAvatar: { src: '', alt: '' }, content: text('hi'), timestamp: '' }],
       showDeliveredOnLast: true,
     };
     expect(chainToMarkdown(chain)).toMatch(/Delivered$/);
@@ -59,7 +59,7 @@ describe('chainToMarkdown', () => {
     const chain: IMessageChain = {
       ...imessageDefaults,
       messages: [{
-        id: '1', sender: 'me',
+        id: '1', sender: 'me', senderName: '', senderAvatar: { src: '', alt: '' },
         content: { type: 'image', image: { src: 'x', alt: 'a sunset' } },
         timestamp: '',
       }],
@@ -71,11 +71,22 @@ describe('chainToMarkdown', () => {
     const chain: IMessageChain = {
       ...imessageDefaults,
       messages: [{
-        id: '1', sender: 'them',
+        id: '1', sender: 'them', senderName: '', senderAvatar: { src: '', alt: '' },
         content: { type: 'video', thumbnail: { src: 'x', alt: '' }, duration: '0:42' },
         timestamp: '',
       }],
     };
     expect(chainToMarkdown(chain)).toContain(`${imessageDefaults.contactName}: [Video (0:42)]`);
+  });
+
+  it('uses the per-message senderName as the speaker label in group mode', () => {
+    const chain: IMessageChain = {
+      ...imessageDefaults,
+      messages: [{
+        id: '1', sender: 'them', senderName: 'Alice', senderAvatar: { src: '', alt: '' },
+        content: text('hi'), timestamp: '',
+      }],
+    };
+    expect(chainToMarkdown(chain)).toContain('Alice: hi');
   });
 });

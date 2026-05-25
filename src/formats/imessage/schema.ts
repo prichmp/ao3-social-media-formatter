@@ -24,6 +24,8 @@ export const imessageSchema = z.object({
   messages: z.array(z.object({
     id: z.string(),
     sender: z.enum(['me', 'them']),
+    senderName: z.string(),
+    senderAvatar: imageRefSchema,
     content: messageContentSchema,
     timestamp: z.string(),
   })),

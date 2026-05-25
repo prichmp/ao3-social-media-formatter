@@ -14,7 +14,11 @@ export function chainToMarkdown(chain: IMessageChain): string {
     if (msg.timestamp.trim() !== '') {
       lines.push('', msg.timestamp.trim());
     }
-    const speaker = msg.sender === 'me' ? 'Me' : name || 'Them';
+    // For 'them', prefer the per-message senderName (group chat) over the
+    // chain-level contactName (1-on-1).
+    const speaker = msg.sender === 'me'
+      ? 'Me'
+      : msg.senderName.trim() || name || 'Them';
     const body = contentToMarkdown(msg.content);
     if (body) {
       lines.push('', `${speaker}: ${body}`);

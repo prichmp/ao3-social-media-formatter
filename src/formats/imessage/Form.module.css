@@ -111,6 +111,22 @@ details[open] .sectionTitle::before {
   gap: 8px;
 }
 
+.senderFields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  background: #f1f6fb;
+  border: 1px dashed #c5dff8;
+  border-radius: 6px;
+}
+
+.senderFieldsDropTarget {
+  outline: 2px dashed #1982FC;
+  outline-offset: -2px;
+  background: #e8f4fd;
+}
+
 .senderRow {
   display: flex;
   gap: 6px;

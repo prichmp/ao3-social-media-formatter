@@ -86,7 +86,14 @@ function TextArea({ value, onChange, placeholder, rows = 2 }: {
 }
 
 function makeMessage(sender: MessageSender): IMessage {
-  return { id: crypto.randomUUID(), sender, content: { type: 'text', text: '' }, timestamp: '' };
+  return {
+    id: crypto.randomUUID(),
+    sender,
+    senderName: '',
+    senderAvatar: { src: '', alt: '' },
+    content: { type: 'text', text: '' },
+    timestamp: '',
+  };
 }
 
 function ContentFields({ content, onChange }: {
@@ -136,11 +143,61 @@ function ContentFields({ content, onChange }: {
   }
 }
 
+// Per-message sender info for group chats. Wrapped in a SavedUser drop
+// target so a contact can be dragged from the user panel straight onto a
+// 'them' message to populate both fields at once.
+function SenderFields({ name, avatar, onNameChange, onAvatarChange, onDrop }: {
+  name: string;
+  avatar: ImageRef;
+  onNameChange: (v: string) => void;
+  onAvatarChange: (v: ImageRef) => void;
+  onDrop: (data: string) => void;
+}) {
+  const drop = useDropTarget(SAVED_USER_DRAG_TYPE, onDrop);
+  return (
+    <div
+      className={`${styles.senderFields}${drop.isDragOver ? ` ${styles.senderFieldsDropTarget}` : ''}`}
+      onDragEnter={drop.onDragEnter}
+      onDragOver={drop.onDragOver}
+      onDragLeave={drop.onDragLeave}
+      onDrop={drop.onDrop}
+    >
+      <Field label="Sender name (group chat)">
+        <TextInput
+          value={name}
+          onChange={onNameChange}
+          placeholder="leave empty for 1-on-1 chat"
+        />
+      </Field>
+      <Field label="Sender avatar (group chat)">
+        <ImageInput
+          value={avatar}
+          onChange={onAvatarChange}
+          defaultDimensions={26}
+          showDimensions={false}
+          uploadMaxSize={160}
+        />
+      </Field>
+    </div>
+  );
+}
+
 function MessageCard({ message, onChange }: {
   message: IMessage;
   onChange: (m: IMessage) => void;
 }) {
   const set = <K extends keyof IMessage>(k: K, v: IMessage[K]) => onChange({ ...message, [k]: v });
+
+  function handleSenderDrop(data: string) {
+    try {
+      const user = JSON.parse(data) as SavedUser;
+      onChange({
+        ...message,
+        senderName: user.name || user.handle || message.senderName,
+        senderAvatar: { ...user.avatar },
+      });
+    } catch { /* ignore */ }
+  }
 
   return (
     <div className={styles.messageCard}>
@@ -162,6 +219,15 @@ function MessageCard({ message, onChange }: {
           </button>
         </div>
       </Field>
+      {message.sender === 'them' && (
+        <SenderFields
+          name={message.senderName}
+          avatar={message.senderAvatar}
+          onNameChange={v => set('senderName', v)}
+          onAvatarChange={v => set('senderAvatar', v)}
+          onDrop={handleSenderDrop}
+        />
+      )}
       <Field label="Content type">
         <select
           className={styles.input}

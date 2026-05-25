@@ -25,6 +25,12 @@ export interface Theme {
   videoBadgeRadius: number;
   videoOverlay: string;
   videoOverlayText: string;
+  // Group-chat fields: avatar next to the last 'them' message in a burst,
+  // sender name above the first message in a burst.
+  groupAvatarSize: number;
+  groupAvatarGap: number;
+  groupSenderNameSize: number;
+  groupSenderNameGap: number;
   bubbleGap: number;
   burstGap: number;
   timestampGap: number;
@@ -82,6 +88,10 @@ export const theme: Theme = {
   videoBadgeRadius: 4,
   videoOverlay: 'rgba(0, 0, 0, 0.6)',
   videoOverlayText: '#ffffff',
+  groupAvatarSize: 26,
+  groupAvatarGap: 6,
+  groupSenderNameSize: 11,
+  groupSenderNameGap: 3,
   bubbleGap: 3,
   burstGap: 10,
   timestampGap: 12,

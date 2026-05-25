@@ -86,19 +86,34 @@ export function layoutChain(
   let y = t.headerHeight + t.burstGap;
 
   // ── Messages ──────────────────────────────────────────────────────────────
-  const bubbleMaxWidth = innerWidth * t.bubbleMaxWidthRatio;
+  // Group mode: if any 'them' message has a per-sender name or avatar set,
+  // reserve a left column for avatars and switch to burst-based grouping by
+  // sender identity. Bubbles in group mode get a narrower max width because
+  // of the reserved avatar column.
+  const isGroup = chain.messages.some(m =>
+    m.sender === 'them' && (m.senderName.trim() !== '' || m.senderAvatar.src !== ''),
+  );
+  const themLeftPad = isGroup ? t.groupAvatarSize + t.groupAvatarGap : 0;
   const lastMeIndex = lastIndexBySender(chain.messages, 'me');
 
   // Lay out a single message body. Returns the bubble box {width, height}.
   // Each branch emits all the prims for that body anchored at (boxX, boxY).
-  const layoutBody = (content: MessageContent, boxX: number, boxY: number, isMe: boolean): { width: number; height: number } => {
+  // `maxWidth` is the cap for the bubble (text wraps to fit, media is sized
+  // to fit) -- the caller passes a smaller value for 'them' in group mode.
+  const layoutBody = (
+    content: MessageContent,
+    boxX: number,
+    boxY: number,
+    isMe: boolean,
+    maxWidth: number,
+  ): { width: number; height: number } => {
     switch (content.type) {
       case 'text': {
-        return renderTextBubble(content.text, boxX, boxY, isMe);
+        return renderTextBubble(content.text, boxX, boxY, isMe, maxWidth);
       }
       case 'image': {
         const img = images.get(content.image.src) ?? null;
-        const { w, h } = mediaSize(img, bubbleMaxWidth, t);
+        const { w, h } = mediaSize(img, maxWidth, t);
         prims.push({
           t: 'image',
           x: boxX,
@@ -114,7 +129,7 @@ export function layoutChain(
       }
       case 'video': {
         const img = images.get(content.thumbnail.src) ?? null;
-        const { w, h } = mediaSize(img, bubbleMaxWidth, t);
+        const { w, h } = mediaSize(img, maxWidth, t);
         // Thumbnail.
         prims.push({
           t: 'image',
@@ -167,9 +182,15 @@ export function layoutChain(
 
   // Wrap text into the bubble's content width, draw the colored bubble
   // background, then the text prims on top. The bubble hugs its content
-  // up to bubbleMaxWidth.
-  const renderTextBubble = (text: string, boxX: number, boxY: number, isMe: boolean): { width: number; height: number } => {
-    const wrapped = wrapText(measurer(t.bubbleSize), text, bubbleMaxWidth - t.bubblePadX * 2);
+  // up to `maxWidth`.
+  const renderTextBubble = (
+    text: string,
+    boxX: number,
+    boxY: number,
+    isMe: boolean,
+    maxWidth: number,
+  ): { width: number; height: number } => {
+    const wrapped = wrapText(measurer(t.bubbleSize), text, maxWidth - t.bubblePadX * 2);
     const bubbleW = widthOfWrapped(wrapped, measurer(t.bubbleSize)) + t.bubblePadX * 2;
     const bubbleH = heightOfWrapped(wrapped, t) + t.bubblePadY * 2;
     prims.push({
@@ -194,6 +215,11 @@ export function layoutChain(
   };
 
   chain.messages.forEach((msg, i) => {
+    const prev = i > 0 ? chain.messages[i - 1] : null;
+    const next = i < chain.messages.length - 1 ? chain.messages[i + 1] : null;
+    const isFirstOfBurst = !prev || !sameBurst(prev, msg);
+    const isLastOfBurst  = !next || !sameBurst(msg, next);
+
     // Timestamp line, centered. Renders above the message it precedes.
     if (msg.timestamp.trim() !== '') {
       if (i > 0) y += t.timestampGap;
@@ -207,23 +233,60 @@ export function layoutChain(
         align: 'center',
       });
       y += lineHeight(t.timestampSize) + t.timestampGap;
-    } else if (i > 0 && chain.messages[i - 1].sender !== msg.sender) {
+    } else if (i > 0 && !sameBurst(prev!, msg)) {
       y += t.burstGap;
     } else if (i > 0) {
       y += t.bubbleGap;
     }
 
     const isMe = msg.sender === 'me';
-    // Lay out the message body at the left edge first so it can size
-    // itself, then translate every prim it emitted to the correct side.
-    const startPrimsAt = prims.length;
-    const size = layoutBody(msg.content, innerLeft, y, isMe);
-    const targetX = isMe ? innerLeft + innerWidth - size.width : innerLeft;
-    if (targetX !== innerLeft) {
-      shiftPrimsX(prims, startPrimsAt, prims.length, targetX - innerLeft);
+
+    // In group mode, drop a sender-name label above the first 'them'
+    // bubble of each burst (skipped when the sender name is blank).
+    if (isGroup && !isMe && isFirstOfBurst && msg.senderName.trim() !== '') {
+      prims.push({
+        t: 'text',
+        x: innerLeft + themLeftPad,
+        y,
+        text: msg.senderName.trim(),
+        font: font(t.groupSenderNameSize),
+        color: t.timestampText,
+      });
+      y += lineHeight(t.groupSenderNameSize) + t.groupSenderNameGap;
     }
 
-    y += size.height;
+    // 'them' in group mode is shifted right by the reserved avatar column;
+    // 'me' and 1-on-1 'them' use the full width.
+    const bubbleLeft = isMe ? innerLeft : innerLeft + themLeftPad;
+    const bubbleAreaW = isMe ? innerWidth : innerWidth - themLeftPad;
+    const bubbleMaxW = bubbleAreaW * t.bubbleMaxWidthRatio;
+
+    // Lay out the message body at `bubbleLeft` first so it can size
+    // itself, then translate every prim it emitted to the correct edge.
+    const startPrimsAt = prims.length;
+    const size = layoutBody(msg.content, bubbleLeft, y, isMe, bubbleMaxW);
+    const targetX = isMe ? innerLeft + innerWidth - size.width : bubbleLeft;
+    if (targetX !== bubbleLeft) {
+      shiftPrimsX(prims, startPrimsAt, prims.length, targetX - bubbleLeft);
+    }
+
+    const bubbleBottom = y + size.height;
+    y = bubbleBottom;
+
+    // Avatar next to the bottom of the burst's final 'them' bubble.
+    if (isGroup && !isMe && isLastOfBurst && msg.senderAvatar.src !== '') {
+      prims.push({
+        t: 'image',
+        x: innerLeft,
+        y: bubbleBottom - t.groupAvatarSize,
+        w: t.groupAvatarSize,
+        h: t.groupAvatarSize,
+        img: images.get(msg.senderAvatar.src) ?? null,
+        circle: true,
+        radius: 0,
+        placeholder: t.placeholder,
+      });
+    }
 
     // "Delivered" label under the final 'me' bubble.
     if (chain.showDeliveredOnLast && isMe && i === lastMeIndex) {
@@ -342,6 +405,16 @@ function lastIndexBySender(messages: IMessage[], sender: MessageSender): number 
     if (messages[i].sender === sender) return i;
   }
   return -1;
+}
+
+// Two adjacent messages belong to the same visual burst when they share a
+// sender. For 'them' messages, also require the same per-message
+// senderName + senderAvatar.src so group-chat bursts split when the
+// speaker changes.
+function sameBurst(a: IMessage, b: IMessage): boolean {
+  if (a.sender !== b.sender) return false;
+  if (a.sender === 'me') return true;
+  return a.senderName === b.senderName && a.senderAvatar.src === b.senderAvatar.src;
 }
 
 export function paintChain(ctx: CanvasRenderingContext2D, layout: ChainLayout): void {

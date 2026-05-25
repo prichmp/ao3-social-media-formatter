@@ -16,6 +16,7 @@ export function collectSrcs(chain: IMessageChain): string[] {
   const srcs: string[] = [];
   if (chain.contactAvatar.src) srcs.push(chain.contactAvatar.src);
   for (const msg of chain.messages) {
+    if (msg.senderAvatar.src) srcs.push(msg.senderAvatar.src);
     switch (msg.content.type) {
       case 'image': if (msg.content.image.src)     srcs.push(msg.content.image.src);     break;
       case 'video': if (msg.content.thumbnail.src) srcs.push(msg.content.thumbnail.src); break;
