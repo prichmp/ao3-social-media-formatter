@@ -53,7 +53,7 @@ export function emptySavedUser(): SavedUser {
     name: '',
     handle: '',
     email: '',
-    color: '#1DA1F2',
+    color: '#093957',
     avatar: { src: '', alt: '' },
     verified: false,
   };

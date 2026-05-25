@@ -195,7 +195,7 @@ function UserFields({ user, onChange }: {
           <input
             type="color"
             className={styles.colorSwatch}
-            value={user.color || '#1DA1F2'}
+            value={user.color || '#093957'}
             onChange={e => onChange({ ...user, color: e.target.value })}
             aria-label="User color"
           />
@@ -204,7 +204,7 @@ function UserFields({ user, onChange }: {
             className={styles.input}
             value={user.color}
             onChange={e => onChange({ ...user, color: e.target.value })}
-            placeholder="#1DA1F2"
+            placeholder="#093957"
           />
         </div>
       </Field>

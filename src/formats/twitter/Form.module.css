@@ -63,7 +63,7 @@ details[open] .sectionTitle::before {
 
 .input:focus {
   outline: none;
-  border-color: #1DA1F2;
+  border-color: #093957;
   box-shadow: 0 0 0 2px rgba(29, 161, 242, 0.2);
 }
 
@@ -80,7 +80,7 @@ details[open] .sectionTitle::before {
 
 .textarea:focus {
   outline: none;
-  border-color: #1DA1F2;
+  border-color: #093957;
   box-shadow: 0 0 0 2px rgba(29, 161, 242, 0.2);
 }
 
@@ -118,7 +118,7 @@ details[open] .sectionTitle::before {
 }
 
 .attachmentDropTarget {
-  outline: 2px dashed #1DA1F2;
+  outline: 2px dashed #093957;
   outline-offset: -2px;
   background: #e8f4fd;
 }
@@ -131,7 +131,7 @@ details[open] .sectionTitle::before {
 }
 
 .sectionDropTarget {
-  outline: 2px dashed #1DA1F2;
+  outline: 2px dashed #093957;
   outline-offset: -2px;
   background: #e8f4fd;
 }
@@ -140,8 +140,8 @@ details[open] .sectionTitle::before {
   align-self: flex-start;
   padding: 4px 10px;
   background: #f0f8ff;
-  color: #1DA1F2;
-  border: 1px solid #1DA1F2;
+  color: #093957;
+  border: 1px solid #093957;
   border-radius: 4px;
   cursor: pointer;
   font-size: 0.8rem;

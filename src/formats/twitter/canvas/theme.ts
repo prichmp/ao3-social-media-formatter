@@ -89,7 +89,7 @@ export const theme: Theme = {
   bg: '#ffffff',
   text: '#0f1419',
   muted: '#657786',
-  link: '#1da1f2',
+  link: '#093957',
   border: '#c7c7c7',
   separator: '#e6e6e6',
   placeholder: '#e1e8ed',
