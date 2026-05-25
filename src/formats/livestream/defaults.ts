@@ -1,57 +1,39 @@
 import type { LivestreamSegment } from './types';
 
 export const livestreamDefaults: LivestreamSegment = {
-  streamer: {
-    avatar: { src: '', alt: '' },
-    name: 'AdoraIRL',
-  },
-  title: 'first time playing hades ii blind (no spoilers!!)',
-  category: 'Hades II',
-  viewerCount: '3.2K',
-  thumbnail: { src: '', alt: '' },
-  showLiveBadge: true,
-  chat: [
-    {
-      id: crypto.randomUUID(),
-      username: 'best_friend_squad',
-      color: '#1E90FF',
-      badges: ['mod', 'subscriber'],
-      content: 'GO MELINOË GO',
+    "streamer": {
+      "avatar": {
+        "src": "",
+        "alt": ""
+      },
+      "name": "Example Streamer"
     },
-    {
-      id: crypto.randomUUID(),
-      username: 'sword_lesbian',
-      color: '#FF7F50',
-      badges: ['subscriber'],
-      content: 'wait you ACTUALLY havent played the first one???',
+    "title": "",
+    "category": "",
+    "viewerCount": "",
+    "thumbnail": {
+      "src": "",
+      "alt": ""
     },
-    {
-      id: crypto.randomUUID(),
-      username: 'catra_apologist',
-      color: '#9147FF',
-      badges: ['vip'],
-      content: 'this is rigged',
-    },
-    {
-      id: crypto.randomUUID(),
-      username: 'AdoraIRL',
-      color: '#FF4500',
-      badges: ['broadcaster'],
-      content: 'it is NOT rigged. ok maybe a little',
-    },
-    {
-      id: crypto.randomUUID(),
-      username: 'arrows_for_days',
-      color: '#00C16E',
-      badges: ['subscriber'],
-      content: 'pog',
-    },
-    {
-      id: crypto.randomUUID(),
-      username: 'glimmerglow',
-      color: '#FF69B4',
-      badges: [],
-      content: 'first time caller long time listener — die already so we can move on',
-    },
-  ],
-};
+    "showLiveBadge": true,
+    "chat": [
+      {
+        "id": "d76249e9-d710-46b4-8532-3fad09e715bd",
+        "username": "IHaveThePower",
+        "color": "#9147ff",
+        "badges": [
+          "mod"
+        ],
+        "content": "Ban for everyone"
+      },
+      {
+        "id": "db8249d0-8a4d-404e-bab8-a381b86a3b1e",
+        "username": "toocool4school",
+        "color": "#20cb59",
+        "badges": [
+          "vip"
+        ],
+        "content": "I'm very cool"
+      }
+    ]
+  };

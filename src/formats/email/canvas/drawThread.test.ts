@@ -41,8 +41,17 @@ describe('layoutThread', () => {
   });
 
   it('renders each timestamp as a right-aligned text prim', () => {
-    const result = layout(emailDefaults);
-    for (const msg of emailDefaults.messages) {
+    // Force non-empty timestamps so the test doesn't depend on the
+    // example defaults happening to include any.
+    const thread: EmailThread = {
+      ...emailDefaults,
+      messages: emailDefaults.messages.map((m, i) => ({
+        ...m,
+        timestamp: `Mon, Jan ${i + 1}, 10:00 AM`,
+      })),
+    };
+    const result = layout(thread);
+    for (const msg of thread.messages) {
       const tsPrim = result.prims.find(p => p.t === 'text' && p.text === msg.timestamp);
       expect(tsPrim).toBeDefined();
       if (tsPrim && tsPrim.t === 'text') {

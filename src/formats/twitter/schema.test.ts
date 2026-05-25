@@ -21,13 +21,22 @@ describe('twitterPostSchema', () => {
   });
 
   it('throws when a reply is missing `attachment`', () => {
+    // Build a reply by hand so the test doesn't depend on the defaults
+    // happening to contain replies.
     const broken = {
       ...twitterDefaults,
-      replies: twitterDefaults.replies.map(r => {
-        const { attachment: _a, ...rest } = r;
-        void _a;
-        return rest;
-      }),
+      replies: [{
+        id: 'r1',
+        avatar: { src: '', alt: '' },
+        name: 'R',
+        handle: 'r',
+        verified: false,
+        relativeTime: '',
+        replyingTo: 'op',
+        content: 'body',
+        // attachment intentionally omitted
+        showStats: true,
+      }],
     };
     expect(() => twitterPostSchema.parse(broken)).toThrow(z.ZodError);
   });
@@ -50,7 +59,7 @@ describe('tweetAttachmentSchema', () => {
   it('accepts every valid discriminator', () => {
     expect(() => tweetAttachmentSchema.parse({ type: 'text' })).not.toThrow();
     expect(() => tweetAttachmentSchema.parse({ type: 'image', image: { src: '', alt: '' } })).not.toThrow();
-    expect(() => tweetAttachmentSchema.parse({ type: 'quote', avatar: { src: '', alt: '' }, name: '', handle: '', content: '' })).not.toThrow();
+    expect(() => tweetAttachmentSchema.parse({ type: 'quote', avatar: { src: '', alt: '' }, name: '', handle: '', verified: false, content: '' })).not.toThrow();
     expect(() => tweetAttachmentSchema.parse({ type: 'video', thumbnail: { src: '', alt: '' }, duration: '' })).not.toThrow();
     expect(() => tweetAttachmentSchema.parse({ type: 'music', albumArt: { src: '', alt: '' }, title: '', artist: '' })).not.toThrow();
   });

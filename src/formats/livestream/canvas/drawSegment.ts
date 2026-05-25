@@ -138,10 +138,6 @@ export function layoutSegment(
   const category = segment.category.trim();
 
   // Compute info bar height from the lines we'll render.
-  let infoLines = 0;
-  if (streamerName) infoLines += 1;
-  if (title)        infoLines += 1;
-  if (category)     infoLines += 1;
   const textBlockH =
     (streamerName ? lineHeight(t.streamerNameSize) : 0) +
     (title        ? lineHeight(t.titleSize)        : 0) +
@@ -200,9 +196,6 @@ export function layoutSegment(
     });
     ty += lineHeight(t.categorySize);
   }
-  // Suppress the unused-warning on infoLines (kept for readability).
-  void infoLines;
-
   y = infoTop + infoBarH;
 
   // ── Chat panel ────────────────────────────────────────────────────────────

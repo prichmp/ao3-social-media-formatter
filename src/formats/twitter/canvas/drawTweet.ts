@@ -16,6 +16,7 @@ type Prim =
   | { t: 'line'; x: number; y: number; w: number; color: string }
   | { t: 'text'; x: number; y: number; text: string; font: string; color: string }
   | { t: 'tri'; x1: number; y1: number; x2: number; y2: number; x3: number; y3: number; fill: string }
+  | { t: 'verified'; x: number; y: number; size: number }
   | { t: 'image'; x: number; y: number; w: number; h: number; img: HTMLImageElement | null; circle: boolean; radius: number };
 
 export interface TweetLayout {
@@ -125,8 +126,13 @@ export function layoutTweet(
         prims.push({ t: 'text', x: qTextX, y: qy, text: qName, font: font(t.quoteNameSize, 'bold'), color: t.text });
         const qNameW = widthOf(qName, t.quoteNameSize, 'bold');
         const qHandleW = widthOf(qHandle, t.handleSize);
-        if (qNameW + 6 + qHandleW <= qHeaderWidth) {
-          prims.push({ t: 'text', x: qTextX + qNameW + 6, y: qy, text: qHandle, font: font(t.handleSize), color: t.muted });
+        const qBadgeSpan = att.verified ? t.verifiedSize + t.verifiedGap : 0;
+        if (att.verified) {
+          const badgeY = qy + (t.quoteNameSize - t.verifiedSize) / 2;
+          prims.push({ t: 'verified', x: qTextX + qNameW + t.verifiedGap, y: badgeY, size: t.verifiedSize });
+        }
+        if (qNameW + qBadgeSpan + 6 + qHandleW <= qHeaderWidth) {
+          prims.push({ t: 'text', x: qTextX + qNameW + qBadgeSpan + 6, y: qy, text: qHandle, font: font(t.handleSize), color: t.muted });
           qy += Math.max(t.quoteAvatarSize, lineHeight(t.quoteNameSize)) + 4;
         } else {
           qy += lineHeight(t.quoteNameSize);
@@ -284,6 +290,14 @@ export function layoutTweet(
     radius: 0,
   });
   prims.push({ t: 'text', x: headTextX, y, text: post.author.name, font: font(t.nameSize, 'bold'), color: t.text });
+  if (post.author.verified) {
+    const nameW = widthOf(post.author.name, t.nameSize, 'bold');
+    // Center against the glyph (fontSize), not the lineHeight box -- the
+    // extra ~35% leading from lineHeight sits below the text, so centering
+    // there pushes the badge visually low.
+    const badgeY = y + (t.nameSize - t.verifiedSize) / 2;
+    prims.push({ t: 'verified', x: headTextX + nameW + t.verifiedGap, y: badgeY, size: t.verifiedSize });
+  }
   prims.push({
     t: 'text',
     x: headTextX,
@@ -343,13 +357,18 @@ export function layoutTweet(
     });
 
     let ry = y;
-    // Name + "@handle · time": same line if it fits, otherwise stacked.
+    // Name [✓] + "@handle · time": same line if it fits, otherwise stacked.
     prims.push({ t: 'text', x: replyTextX, y: ry, text: reply.name, font: font(t.nameSize, 'bold'), color: t.text });
     const nameW = widthOf(reply.name, t.nameSize, 'bold');
+    const badgeSpan = reply.verified ? t.verifiedSize + t.verifiedGap : 0;
+    if (reply.verified) {
+      const badgeY = ry + (t.nameSize - t.verifiedSize) / 2;
+      prims.push({ t: 'verified', x: replyTextX + nameW + t.verifiedGap, y: badgeY, size: t.verifiedSize });
+    }
     const meta = `@${reply.handle}${reply.relativeTime ? ` · ${reply.relativeTime}` : ''}`;
     const metaW = widthOf(meta, t.handleSize);
-    if (nameW + 6 + metaW <= replyTextWidth) {
-      prims.push({ t: 'text', x: replyTextX + nameW + 6, y: ry, text: meta, font: font(t.handleSize), color: t.muted });
+    if (nameW + badgeSpan + 6 + metaW <= replyTextWidth) {
+      prims.push({ t: 'text', x: replyTextX + nameW + badgeSpan + 6, y: ry, text: meta, font: font(t.handleSize), color: t.muted });
       ry += lineHeight(t.nameSize);
     } else {
       ry += lineHeight(t.nameSize);
@@ -447,6 +466,28 @@ export function paintTweet(ctx: CanvasRenderingContext2D, layout: TweetLayout, t
         ctx.closePath();
         ctx.fillStyle = p.fill;
         ctx.fill();
+        break;
+      }
+      case 'verified': {
+        // Blue disc + white checkmark, drawn fully in code so we don't
+        // need an external glyph or PNG. Sized by p.size (diameter).
+        const cx = p.x + p.size / 2;
+        const cy = p.y + p.size / 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, p.size / 2, 0, Math.PI * 2);
+        ctx.fillStyle = t.verifiedBg;
+        ctx.fill();
+        // Checkmark as two line segments. Geometry is proportional to size
+        // so it looks consistent at any badge dimension.
+        ctx.strokeStyle = t.verifiedFg;
+        ctx.lineWidth = Math.max(1.4, p.size * 0.12);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(p.x + p.size * 0.26, p.y + p.size * 0.52);
+        ctx.lineTo(p.x + p.size * 0.44, p.y + p.size * 0.70);
+        ctx.lineTo(p.x + p.size * 0.76, p.y + p.size * 0.34);
+        ctx.stroke();
         break;
       }
       case 'image': {

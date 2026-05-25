@@ -43,12 +43,15 @@ describe('layoutTweet', () => {
       } else if (p.t === 'text') {
         expect(p.x).toBeGreaterThanOrEqual(0);
         expect(p.x).toBeLessThan(theme.cardWidth);
-      } else {
-        // 'tri': each vertex must be inside the card.
+      } else if (p.t === 'tri') {
         for (const x of [p.x1, p.x2, p.x3]) {
           expect(x).toBeGreaterThanOrEqual(0);
           expect(x).toBeLessThanOrEqual(theme.cardWidth);
         }
+      } else {
+        // 'verified' badge: top-left corner must sit inside the card.
+        expect(p.x).toBeGreaterThanOrEqual(0);
+        expect(p.x + p.size).toBeLessThanOrEqual(theme.cardWidth + 0.5);
       }
     }
   });
@@ -85,6 +88,7 @@ describe('layoutTweet', () => {
         type: 'quote',
         name: 'Quoted',
         handle: 'quoted',
+        verified: false,
         content: 'A quoted tweet body.',
         avatar: { src: '', alt: '' },
       },
@@ -134,10 +138,23 @@ describe('layoutTweet', () => {
   });
 
   it('grows taller when a reply has an attachment of its own', () => {
-    const baseReply = twitterDefaults.replies[0];
+    // Synthesize a reply rather than borrowing from defaults so this test
+    // doesn't break when the example post changes.
+    const baseReply: TwitterPost['replies'][number] = {
+      id: 'r1',
+      avatar: { src: '', alt: '' },
+      name: 'R',
+      handle: 'r',
+      verified: false,
+      relativeTime: '',
+      replyingTo: 'op',
+      content: 'reply body',
+      attachment: { type: 'text' },
+      showStats: false,
+    };
     const noAtt = layout({
       ...twitterDefaults,
-      replies: [{ ...baseReply, attachment: { type: 'text' } }],
+      replies: [baseReply],
     });
     const withAtt = layout({
       ...twitterDefaults,
@@ -151,7 +168,7 @@ describe('layoutTweet', () => {
 
   it('renders a minimal empty post without throwing', () => {
     const empty: TwitterPost = {
-      author: { avatar: { src: '', alt: '' }, name: '', handle: '' },
+      author: { avatar: { src: '', alt: '' }, name: '', handle: '', verified: false },
       content: '',
       attachment: { type: 'text' },
       time: '',

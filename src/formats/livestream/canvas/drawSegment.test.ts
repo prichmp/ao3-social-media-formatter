@@ -50,8 +50,12 @@ describe('layoutSegment', () => {
   });
 
   it('renders the streamer name in bold', () => {
-    const result = layout(livestreamDefaults);
-    const nameText = result.prims.find(p => p.t === 'text' && p.text === livestreamDefaults.streamer.name);
+    const segment: LivestreamSegment = {
+      ...livestreamDefaults,
+      streamer: { ...livestreamDefaults.streamer, name: 'AdoraIRL' },
+    };
+    const result = layout(segment);
+    const nameText = result.prims.find(p => p.t === 'text' && p.text === 'AdoraIRL');
     expect(nameText).toBeDefined();
     if (nameText && nameText.t === 'text') {
       expect(nameText.font).toMatch(/bold/);
@@ -86,8 +90,13 @@ describe('layoutSegment', () => {
   });
 
   it('grows taller when chat messages are added', () => {
-    const small = layout({ ...livestreamDefaults, chat: livestreamDefaults.chat.slice(0, 1) });
-    const large = layout(livestreamDefaults);
+    const makeChat = (n: number): LivestreamSegment['chat'] =>
+      Array.from({ length: n }, (_, i) => ({
+        id: `c${i}`, username: `u${i}`, color: '#fff',
+        badges: [], content: `msg ${i}`,
+      }));
+    const small = layout({ ...livestreamDefaults, chat: makeChat(1) });
+    const large = layout({ ...livestreamDefaults, chat: makeChat(5) });
     expect(large.height).toBeGreaterThan(small.height);
   });
 

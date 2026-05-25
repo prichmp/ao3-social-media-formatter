@@ -17,6 +17,12 @@ export interface SavedUser {
   email: string;
   color: string;
   avatar: ImageRef;
+  /**
+   * Twitter-style blue verified checkmark. Currently only the twitter
+   * format renders it; other formats ignore the field when a SavedUser
+   * is dragged in.
+   */
+  verified: boolean;
 }
 
 const imageRefSchema = z.object({
@@ -33,6 +39,7 @@ export const savedUserSchema = z.object({
   email: z.string(),
   color: z.string(),
   avatar: imageRefSchema,
+  verified: z.boolean(),
 });
 
 // Compile-time conformance check.
@@ -48,5 +55,6 @@ export function emptySavedUser(): SavedUser {
     email: '',
     color: '#1DA1F2',
     avatar: { src: '', alt: '' },
+    verified: false,
   };
 }

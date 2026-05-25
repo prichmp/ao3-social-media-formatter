@@ -137,6 +137,7 @@ function ChatCard({ message, onChange }: {
       email: '',
       color: message.color,
       avatar: { src: '', alt: '' },
+      verified: false,
     };
     addUser(user);
   }

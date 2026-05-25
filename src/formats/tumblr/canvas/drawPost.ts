@@ -144,10 +144,6 @@ function layoutEntry(
     font: font(t.usernameSize, 'bold'),
     color: t.text,
   });
-  // Suppress unused-warning while keeping the measurement available for
-  // future "follow" button placement, etc.
-  void widthOf;
-
   if (isSilent) {
     // Compact "reblogged this" line, inline next to the username.
     const nameW = widthOf(username, t.usernameSize, 'bold');

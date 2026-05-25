@@ -33,7 +33,7 @@ describe('collectSrcs', () => {
   it('includes the avatar src for a quote attachment', () => {
     const post: TwitterPost = {
       ...twitterDefaults,
-      attachment: { type: 'quote', avatar: { src: 'https://q/avatar.png', alt: '' }, name: 'n', handle: 'h', content: 'c' },
+      attachment: { type: 'quote', avatar: { src: 'https://q/avatar.png', alt: '' }, name: 'n', handle: 'h', verified: false, content: 'c' },
     };
     expect(collectSrcs(post)).toContain('https://q/avatar.png');
   });
@@ -58,7 +58,10 @@ describe('collectSrcs', () => {
     const post: TwitterPost = {
       ...twitterDefaults,
       replies: [{
-        ...twitterDefaults.replies[0],
+        id: 'r1', avatar: { src: '', alt: '' },
+        name: 'R', handle: 'r', verified: false,
+        relativeTime: '', replyingTo: 'op',
+        content: '', showStats: false,
         attachment: { type: 'image', image: { src: 'https://r/inline.png', alt: '' } },
       }],
     };
@@ -70,7 +73,12 @@ describe('collectSrcs', () => {
     const post: TwitterPost = {
       ...twitterDefaults,
       author: { ...twitterDefaults.author, avatar: { src: dup, alt: '' } },
-      replies: [{ ...twitterDefaults.replies[0], avatar: { src: dup, alt: '' } }],
+      replies: [{
+        id: 'r1', avatar: { src: dup, alt: '' },
+        name: 'R', handle: 'r', verified: false,
+        relativeTime: '', replyingTo: 'op',
+        content: '', attachment: { type: 'text' }, showStats: false,
+      }],
     };
     expect(collectSrcs(post).filter((s) => s === dup)).toHaveLength(1);
   });

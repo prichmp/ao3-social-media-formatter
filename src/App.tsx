@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { z } from 'zod';
 import { Layout } from './components/Layout';
 import { CanvasPreview, type RenderStatus } from './components/CanvasPreview';
@@ -10,9 +10,9 @@ import { ImgTagSnippet } from './components/ImgTagSnippet';
 import { tweetToMarkdown } from './lib/markdownBuilder';
 import { selfClose, serializeMinified } from './lib/htmlBuilder';
 import { formats } from './formats/registry';
-import { saveState, loadState, clearState } from './lib/storage';
 import { loadSaves, upsertSave, deleteSave } from './lib/saves';
 import type { NamedSave } from './lib/saves';
+import { loadUsers, saveUsers } from './lib/usersStorage';
 import { UserListContext } from './lib/UserListContext';
 import type { TwitterPost } from './formats/twitter/types';
 import { twitterPostSchema } from './formats/twitter/schema';
@@ -41,19 +41,13 @@ import styles from './App.module.css';
 type FormatId = 'twitter' | 'imessage' | 'livestream' | 'email' | 'tumblr';
 const formatIdSchema = z.enum(['twitter', 'imessage', 'livestream', 'email', 'tumblr']);
 
-// Schema for the full app state stored in localStorage. Validated on load;
-// any mismatch (or corrupt JSON) clears the key and reloads with defaults.
-const appStateSchema = z.object({
-  activeFormat: formatIdSchema,
-  twitter:    twitterPostSchema,
-  imessage:   imessageSchema,
-  livestream: livestreamSchema,
-  email:      emailSchema,
-  tumblr:     tumblrSchema,
-  users: z.array(savedUserSchema),
-  currentSaveId: z.string().nullable(),
-  currentSaveName: z.string().nullable(),
-});
+// Editing state is intentionally NOT persisted -- multi-tab use was
+// clobbering itself because both tabs auto-loaded and auto-saved against
+// the same key. The Save / Load menu (NamedSave) is the persistence
+// mechanism for in-progress work; the saved-users list persists in its
+// own key via `usersStorage` so tabs share contacts but don't fight over
+// drafts. `formatIdSchema` (above) is still used to validate the
+// active-format dropdown's value at the dispatch site.
 
 // Schema for the wrapper object produced by handleExport (and consumed by
 // handleImportFile). Discriminated by `format` so a single file can carry
@@ -105,6 +99,10 @@ const userListImportSchema = z.object({
   users: z.array(savedUserSchema),
 });
 
+// AppState only holds the live editing buffer. It is *not* persisted --
+// each tab starts from defaults and the user opts in to persistence via
+// the Save / Load menu. The users list lives in a separate React state
+// backed by its own localStorage key (see `loadUsers` / `saveUsers`).
 interface AppState {
   activeFormat: FormatId;
   twitter: TwitterPost;
@@ -112,13 +110,12 @@ interface AppState {
   livestream: LivestreamSegment;
   email: EmailThread;
   tumblr: TumblrPost;
-  users: SavedUser[];
   currentSaveId: string | null;
   currentSaveName: string | null;
 }
 
 const EMPTY_TWITTER: TwitterPost = {
-  author: { avatar: { src: '', alt: '', width: 50, height: 50 }, name: '', handle: '' },
+  author: { avatar: { src: '', alt: '', width: 50, height: 50 }, name: '', handle: '', verified: false },
   content: '',
   attachment: { type: 'text' },
   time: '',
@@ -158,8 +155,8 @@ const EMPTY_TUMBLR: TumblrPost = {
 };
 
 function getInitialState(): AppState {
-  const saved = loadState(appStateSchema);
-  if (saved) return saved;
+  // Always start from defaults. Editing state is tab-local now -- the
+  // user uses Save / Load to persist anything they want to keep.
   return {
     activeFormat: 'twitter',
     twitter: formats.find(f => f.id === 'twitter')!.defaults as TwitterPost,
@@ -167,7 +164,6 @@ function getInitialState(): AppState {
     livestream: livestreamDefaults,
     email: emailDefaults,
     tumblr: tumblrDefaults,
-    users: [],
     currentSaveId: null,
     currentSaveName: null,
   };
@@ -218,6 +214,10 @@ function setActiveData(state: AppState, data: ActiveData): AppState {
 
 export default function App() {
   const [state, setState] = useState<AppState>(getInitialState);
+  // SavedUser list is the one slice that persists. Each tab loads on
+  // mount and auto-saves on change (last-write-wins across tabs -- see
+  // usersStorage for the rationale).
+  const [users, setUsers] = useState<SavedUser[]>(() => loadUsers());
   const [canvasEl, setCanvasEl] = useState<HTMLCanvasElement | null>(null);
   const [renderStatus, setRenderStatus] = useState<RenderStatus>('pending');
   const [renderSize, setRenderSize] = useState<{ width: number; height: number } | null>(null);
@@ -235,8 +235,8 @@ export default function App() {
   const userFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    saveState(state);
-  }, [state]);
+    saveUsers(users);
+  }, [users]);
 
   useEffect(() => {
     if (modal.type === 'name') {
@@ -438,7 +438,7 @@ export default function App() {
   }
 
   function handleExportUsers() {
-    if (state.users.length === 0) {
+    if (users.length === 0) {
       alert('No saved users to export. Add a user from the Users panel first.');
       return;
     }
@@ -446,7 +446,7 @@ export default function App() {
       version: 1,
       kind: 'user-list' as const,
       savedAt: new Date().toISOString(),
-      users: state.users,
+      users,
     };
     downloadJson(data, 'ao3-user-list.json');
   }
@@ -471,8 +471,8 @@ export default function App() {
         // they can't accidentally collide with anything local.
         let added = 0;
         let skipped = 0;
-        setState(s => {
-          const next = [...s.users];
+        setUsers(prev => {
+          const next = [...prev];
           for (const u of parsed.users) {
             const isDup = next.some(existing =>
               existing.name === u.name &&
@@ -486,7 +486,7 @@ export default function App() {
             next.push({ ...u, id: crypto.randomUUID() });
             added++;
           }
-          return { ...s, users: next };
+          return next;
         });
         setUsersOpen(true);
         alert(
@@ -558,19 +558,22 @@ export default function App() {
                                           { ...s, tumblr:     tumblrDefaults     };
       return { ...reset, currentSaveId: null, currentSaveName: null };
     });
-    clearState();
   }
 
-  const userListContext = {
-    users: state.users,
+  // Memoize the context value so consumers re-render only when users or
+  // the drawer-open toggle actually changes (the closures themselves are
+  // stable because they only touch setters).
+  const userListContext = useMemo(() => ({
+    users,
     addUser: (user: SavedUser) => {
-      setState(s => ({ ...s, users: [...s.users, user] }));
+      setUsers(prev => [...prev, user]);
       setUsersOpen(true);
     },
     updateUser: (user: SavedUser) =>
-      setState(s => ({ ...s, users: s.users.map(u => (u.id === user.id ? user : u)) })),
-    removeUser: (id: string) => setState(s => ({ ...s, users: s.users.filter(u => u.id !== id) })),
-  };
+      setUsers(prev => prev.map(u => (u.id === user.id ? user : u))),
+    removeUser: (id: string) =>
+      setUsers(prev => prev.filter(u => u.id !== id)),
+  }), [users]);
 
   // The registry erases per-format generics so we cast back to a wider
   // `any` shape here; each Form / renderImage knows its own type internally.

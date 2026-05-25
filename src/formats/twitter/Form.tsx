@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import type { AttachmentType, TweetAttachment, TwitterPost, TwitterReply, TwitterUser } from './types';
-import { TWITTER_USER_DRAG_TYPE, defaultAttachment } from './types';
+import type { AttachmentType, TweetAttachment, TwitterPost, TwitterReply } from './types';
+import { defaultAttachment } from './types';
 import type { ImageRef } from '../types';
+import { SAVED_USER_DRAG_TYPE, type SavedUser } from '../../lib/savedUser';
 import { ImageInput } from '../../components/ImageInput';
 import { RepeatableList } from '../../components/RepeatableList';
 import { useUserList } from '../../lib/UserListContext';
@@ -84,6 +85,7 @@ function makeReply(authorHandle: string): TwitterReply {
     avatar: { src: '', alt: '', width: 50, height: 50 },
     name: '',
     handle: '',
+    verified: false,
     relativeTime: '',
     replyingTo: authorHandle,
     content: '',
@@ -107,13 +109,14 @@ function ReplyCard({ reply, onChange, replyOptions }: {
     !users.some(u => u.name === reply.name && u.handle === reply.handle);
 
   function handleAddToUserList() {
-    const user: TwitterUser = {
+    const user: SavedUser = {
       id: crypto.randomUUID(),
       name: reply.name,
       handle: reply.handle,
       email: '',
       color: '',
       avatar: reply.avatar,
+      verified: reply.verified,
     };
     addUser(user);
   }
@@ -129,6 +132,14 @@ function ReplyCard({ reply, onChange, replyOptions }: {
       <Field label="Handle (@)">
         <TextInput value={reply.handle} onChange={v => set('handle', v)} placeholder="handle" />
       </Field>
+      <label className={styles.checkLabel}>
+        <input
+          type="checkbox"
+          checked={reply.verified}
+          onChange={e => set('verified', e.target.checked)}
+        />
+        Verified ✓
+      </label>
       <Field label="Relative time">
         <TextInput value={reply.relativeTime} onChange={v => set('relativeTime', v)} placeholder="10 hours ago" />
       </Field>
@@ -202,17 +213,18 @@ function QuoteFields({ attachment, onChange }: {
       email: '',
       color: '',
       avatar: attachment.avatar,
+      verified: attachment.verified,
     });
   }
 
   function handleDrop(e: React.DragEvent) {
     setIsDragOver(false);
-    const data = e.dataTransfer.getData(TWITTER_USER_DRAG_TYPE);
+    const data = e.dataTransfer.getData(SAVED_USER_DRAG_TYPE);
     if (!data) return;
     e.preventDefault();
     try {
-      const user = JSON.parse(data) as TwitterUser;
-      onChange({ ...attachment, name: user.name, handle: user.handle, avatar: { ...user.avatar } });
+      const user = JSON.parse(data) as SavedUser;
+      onChange({ ...attachment, name: user.name, handle: user.handle, verified: user.verified, avatar: { ...user.avatar } });
     } catch {
       // ignore malformed drag data
     }
@@ -222,12 +234,12 @@ function QuoteFields({ attachment, onChange }: {
     <div
       className={`${styles.attachmentBox}${isDragOver ? ` ${styles.attachmentDropTarget}` : ''}`}
       onDragEnter={e => {
-        if (!e.dataTransfer.types.includes(TWITTER_USER_DRAG_TYPE)) return;
+        if (!e.dataTransfer.types.includes(SAVED_USER_DRAG_TYPE)) return;
         e.preventDefault();
         setIsDragOver(true);
       }}
       onDragOver={e => {
-        if (!e.dataTransfer.types.includes(TWITTER_USER_DRAG_TYPE)) return;
+        if (!e.dataTransfer.types.includes(SAVED_USER_DRAG_TYPE)) return;
         e.preventDefault();
       }}
       onDragLeave={e => {
@@ -251,6 +263,14 @@ function QuoteFields({ attachment, onChange }: {
       <Field label="Quote handle (@)">
         <TextInput value={attachment.handle} onChange={v => onChange({ ...attachment, handle: v })} placeholder="handle" />
       </Field>
+      <label className={styles.checkLabel}>
+        <input
+          type="checkbox"
+          checked={attachment.verified}
+          onChange={e => onChange({ ...attachment, verified: e.target.checked })}
+        />
+        Verified ✓
+      </label>
       <Field label="Quote text">
         <TextArea value={attachment.content} onChange={v => onChange({ ...attachment, content: v })} rows={2} />
       </Field>
@@ -334,8 +354,8 @@ export function TwitterForm({ state, onChange }: Props) {
 
   function handleAuthorDrop(data: string) {
     try {
-      const user = JSON.parse(data) as TwitterUser;
-      set('author', { ...state.author, name: user.name, handle: user.handle, avatar: user.avatar });
+      const user = JSON.parse(data) as SavedUser;
+      set('author', { ...state.author, name: user.name, handle: user.handle, verified: user.verified, avatar: user.avatar });
     } catch {
       // ignore malformed drag data
     }
@@ -343,10 +363,11 @@ export function TwitterForm({ state, onChange }: Props) {
 
   function handleReplyDrop(data: string, index: number) {
     try {
-      const user = JSON.parse(data) as TwitterUser;
+      const user = JSON.parse(data) as SavedUser;
       const newReply = makeReply(state.author.handle);
       newReply.name = user.name;
       newReply.handle = user.handle;
+      newReply.verified = user.verified;
       newReply.avatar = { ...user.avatar };
       const next = [...state.replies];
       next.splice(index, 0, newReply);
@@ -387,7 +408,7 @@ export function TwitterForm({ state, onChange }: Props) {
     <div className={styles.form}>
       <Section
         title="Author"
-        externalDragType={TWITTER_USER_DRAG_TYPE}
+        externalDragType={SAVED_USER_DRAG_TYPE}
         onExternalDrop={handleAuthorDrop}
       >
         <Field label="Avatar">
@@ -405,6 +426,14 @@ export function TwitterForm({ state, onChange }: Props) {
         <Field label="Handle (@)">
           <TextInput value={state.author.handle} onChange={v => set('author', { ...state.author, handle: v })} placeholder="handle" />
         </Field>
+        <label className={styles.checkLabel}>
+          <input
+            type="checkbox"
+            checked={state.author.verified}
+            onChange={e => set('author', { ...state.author, verified: e.target.checked })}
+          />
+          Verified ✓
+        </label>
         <Field label="Time">
           <TextInput value={state.time} onChange={v => set('time', v)} placeholder="9:40 AM" />
         </Field>
@@ -453,7 +482,7 @@ export function TwitterForm({ state, onChange }: Props) {
           onAdd={() => set('replies', [...state.replies, makeReply(state.author.handle)])}
           onRemove={id => set('replies', state.replies.filter(r => r.id !== id))}
           addLabel="Add reply"
-          externalDragType={TWITTER_USER_DRAG_TYPE}
+          externalDragType={SAVED_USER_DRAG_TYPE}
           onExternalDrop={handleReplyDrop}
           renderItem={(reply, onChange) => (
             <ReplyCard

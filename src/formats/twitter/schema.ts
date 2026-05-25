@@ -24,6 +24,7 @@ export const tweetAttachmentSchema = z.discriminatedUnion('type', [
     avatar: imageRefSchema,
     name: z.string(),
     handle: z.string(),
+    verified: z.boolean(),
     content: z.string(),
   }),
   z.object({
@@ -44,6 +45,7 @@ export const twitterReplySchema = z.object({
   avatar: imageRefSchema,
   name: z.string(),
   handle: z.string(),
+  verified: z.boolean(),
   relativeTime: z.string(),
   replyingTo: z.string(),
   content: z.string(),
@@ -56,6 +58,7 @@ export const twitterPostSchema = z.object({
     avatar: imageRefSchema,
     name: z.string(),
     handle: z.string(),
+    verified: z.boolean(),
   }),
   content: z.string(),
   attachment: tweetAttachmentSchema,

@@ -118,6 +118,7 @@ function MessageCard({ message, onChange }: {
       email: message.senderEmail,
       color: message.senderColor,
       avatar: message.senderAvatar,
+      verified: false,
     };
     addUser(user);
   }

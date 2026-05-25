@@ -16,13 +16,28 @@ describe('postToMarkdown', () => {
   });
 
   it('emits a "reblogged this" line for silent reblogs', () => {
-    const md = postToMarkdown(tumblrDefaults);
-    expect(md).toContain('cherrybonfire-official reblogged this');
+    const post: TumblrPost = {
+      ...tumblrDefaults,
+      entries: [
+        { id: '1', username: 'op',     avatar: { src: '', alt: '' }, content: 'hi', image: { src: '', alt: '' }, tags: [] },
+        { id: '2', username: 'silent', avatar: { src: '', alt: '' }, content: '',   image: { src: '', alt: '' }, tags: [] },
+      ],
+    };
+    expect(postToMarkdown(post)).toContain('silent reblogged this');
   });
 
   it('formats tags as space-separated #tags on their own line', () => {
-    const md = postToMarkdown(tumblrDefaults);
-    expect(md).toContain('#adora discourse #catra discourse');
+    const post: TumblrPost = {
+      ...tumblrDefaults,
+      entries: [{
+        id: '1', username: 'op',
+        avatar: { src: '', alt: '' },
+        content: 'hi',
+        image: { src: '', alt: '' },
+        tags: ['adora discourse', 'catra discourse'],
+      }],
+    };
+    expect(postToMarkdown(post)).toContain('#adora discourse #catra discourse');
   });
 
   it('renders the footer with notes count + timestamp', () => {

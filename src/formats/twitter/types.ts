@@ -1,16 +1,11 @@
 import type { ImageRef } from '../types';
 
-// SavedUser is the canonical shape; re-export here so legacy imports
-// (formats/twitter consumers) keep working while we migrate call sites.
-export type { SavedUser as TwitterUser } from '../../lib/savedUser';
-export { SAVED_USER_DRAG_TYPE as TWITTER_USER_DRAG_TYPE } from '../../lib/savedUser';
-
 // Discriminated union: a tweet (or reply) has exactly one attachment kind.
 // The 'text' case is the no-attachment default and carries no extra data.
 export type TweetAttachment =
   | { type: 'text' }
   | { type: 'image'; image: ImageRef }
-  | { type: 'quote'; avatar: ImageRef; name: string; handle: string; content: string }
+  | { type: 'quote'; avatar: ImageRef; name: string; handle: string; verified: boolean; content: string }
   | { type: 'video'; thumbnail: ImageRef; duration: string }
   | { type: 'music'; albumArt: ImageRef; title: string; artist: string };
 
@@ -21,6 +16,8 @@ export interface TwitterReply {
   avatar: ImageRef;
   name: string;
   handle: string;
+  /** Show a blue verified checkmark next to the name. */
+  verified: boolean;
   relativeTime: string;
   replyingTo: string;
   content: string;
@@ -29,7 +26,7 @@ export interface TwitterReply {
 }
 
 export interface TwitterPost {
-  author: { avatar: ImageRef; name: string; handle: string };
+  author: { avatar: ImageRef; name: string; handle: string; verified: boolean };
   content: string;
   attachment: TweetAttachment;
   time: string;
@@ -44,7 +41,7 @@ export function defaultAttachment(type: AttachmentType): TweetAttachment {
   switch (type) {
     case 'text':  return { type: 'text' };
     case 'image': return { type: 'image', image: { src: '', alt: '' } };
-    case 'quote': return { type: 'quote', avatar: { src: '', alt: '', width: 50, height: 50 }, name: '', handle: '', content: '' };
+    case 'quote': return { type: 'quote', avatar: { src: '', alt: '', width: 50, height: 50 }, name: '', handle: '', verified: false, content: '' };
     case 'video': return { type: 'video', thumbnail: { src: '', alt: '' }, duration: '' };
     case 'music': return { type: 'music', albumArt: { src: '', alt: '' }, title: '', artist: '' };
   }

@@ -196,6 +196,30 @@ details[open] .addSummary {
   text-overflow: ellipsis;
 }
 
+.verifiedDot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  margin-left: 4px;
+  background: #1d9bf0;
+  color: white;
+  border-radius: 50%;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.checkLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: #444;
+  cursor: pointer;
+}
+
 .iconBtn,
 .removeBtn {
   background: none;

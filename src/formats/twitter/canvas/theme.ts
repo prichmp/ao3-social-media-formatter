@@ -55,6 +55,12 @@ export interface Theme {
   statIconHeight: number;
   statIconGap: number;
 
+  // Verified badge
+  verifiedSize: number;
+  verifiedGap: number;
+  verifiedBg: string;
+  verifiedFg: string;
+
   // Export
   exportScale: number;
 }
@@ -105,6 +111,11 @@ export const theme: Theme = {
 
   statIconHeight: 13,
   statIconGap: 27.2,
+
+  verifiedSize: 16,
+  verifiedGap: 4,
+  verifiedBg: '#1d9bf0',
+  verifiedFg: '#ffffff',
 
   exportScale: 2,
 };

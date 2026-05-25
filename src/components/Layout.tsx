@@ -17,12 +17,6 @@ export function Layout({ header, form, preview, output, userList, usersOpen, onU
   return (
     <div className={styles.shell}>
       <header className={styles.header}>
-        <button
-          className={`${styles.usersToggle} ${usersOpen ? styles.usersToggleActive : ''}`}
-          onClick={() => setUsersOpen(o => !o)}
-        >
-          Saved Users
-        </button>
         {header}
       </header>
       <div className={styles.body}>
@@ -53,6 +47,23 @@ export function Layout({ header, form, preview, output, userList, usersOpen, onU
           </div>
         </div>
       </div>
+      <footer className={styles.footer}>
+        <span>Not affiliated with AO3</span>
+        <span className={styles.footerSep} aria-hidden="true">·</span>
+        <span>
+          For bugs,{' '}
+          <a
+            className={styles.footerLink}
+            href="https://github.com/prichmp/ao3-social-media-formatter/issues"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            file an issue on GitHub
+          </a>
+        </span>
+        <span className={styles.footerSep} aria-hidden="true">·</span>
+        <span>If errors persist after refresh, try clearing your browser&apos;s Local Storage.</span>
+      </footer>
     </div>
   );
 }

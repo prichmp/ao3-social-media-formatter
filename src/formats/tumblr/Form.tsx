@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { TumblrEntry, TumblrPost } from './types';
 import type { ImageRef } from '../types';
 import { ImageInput } from '../../components/ImageInput';
@@ -69,6 +69,10 @@ function TextArea({ value, onChange, placeholder, rows = 3 }: {
   );
 }
 
+function parseTags(raw: string): string[] {
+  return raw.split(',').map(p => p.trim()).filter(Boolean);
+}
+
 function makeEntry(): TumblrEntry {
   return {
     id: crypto.randomUUID(),
@@ -90,16 +94,26 @@ function EntryCard({ entry, isOriginal, onChange }: {
     onChange({ ...entry, [k]: v });
   const setAvatar = (v: ImageRef) => set('avatar', v);
 
-  // Tags are stored as string[]; display them as a single comma- or
-  // space-separated input for ergonomics. We split on commas first, then
-  // on whitespace, so "tag one, tag two" and "tag_one tag_two" both work.
-  const tagsString = entry.tags.join(', ');
+  // Tags are stored as string[] but the input is a single comma-separated
+  // string. Keep the raw text as local state so typing a comma or trailing
+  // space isn't immediately erased by re-derivation from `entry.tags`.
+  // When `entry.tags` changes externally (drag-drop on the card, etc.) the
+  // effect below replaces the local text to match.
+  const [tagsRaw, setTagsRaw] = useState(() => entry.tags.join(', '));
+
+  useEffect(() => {
+    const parsedFromRaw = parseTags(tagsRaw);
+    if (JSON.stringify(parsedFromRaw) !== JSON.stringify(entry.tags)) {
+      setTagsRaw(entry.tags.join(', '));
+    }
+    // Intentionally only watch entry.tags. Watching tagsRaw too would
+    // fight the user mid-keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entry.tags]);
+
   function setTagsFromString(raw: string) {
-    const parts = raw
-      .split(',')
-      .map(p => p.trim())
-      .filter(Boolean);
-    set('tags', parts);
+    setTagsRaw(raw);
+    set('tags', parseTags(raw));
   }
 
   function handleDrop(data: string) {
@@ -126,6 +140,7 @@ function EntryCard({ entry, isOriginal, onChange }: {
       email: '',
       color: '',
       avatar: entry.avatar,
+      verified: false,
     };
     addUser(user);
   }
@@ -165,7 +180,7 @@ function EntryCard({ entry, isOriginal, onChange }: {
       </Field>
       <Field label="Tags (comma-separated, no #)">
         <TextInput
-          value={tagsString}
+          value={tagsRaw}
           onChange={setTagsFromString}
           placeholder="adoradiscourse, long post, sword lesbians"
         />

@@ -33,7 +33,12 @@ describe('chainToMarkdown', () => {
   });
 
   it('appends a Delivered marker when the flag is set and any "me" message exists', () => {
-    expect(chainToMarkdown(imessageDefaults)).toMatch(/Delivered$/);
+    const chain: IMessageChain = {
+      ...imessageDefaults,
+      messages: [{ id: '1', sender: 'me', content: text('hi'), timestamp: '' }],
+      showDeliveredOnLast: true,
+    };
+    expect(chainToMarkdown(chain)).toMatch(/Delivered$/);
   });
 
   it('omits Delivered when the flag is off', () => {

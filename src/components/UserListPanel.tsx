@@ -100,7 +100,10 @@ function ViewCard({ user, onEdit, onRemove, onDragStart }: {
         </span>
       )}
       <div className={styles.info}>
-        <span className={styles.name}>{user.name || user.handle || '—'}</span>
+        <span className={styles.name}>
+          {user.name || user.handle || '—'}
+          {user.verified && <span className={styles.verifiedDot} title="Verified">✓</span>}
+        </span>
         <span className={styles.handle}>
           {user.handle ? `@${user.handle}` : user.email}
         </span>
@@ -214,6 +217,14 @@ function UserFields({ user, onChange }: {
           uploadMaxSize={240}
         />
       </Field>
+      <label className={styles.checkLabel}>
+        <input
+          type="checkbox"
+          checked={user.verified}
+          onChange={e => onChange({ ...user, verified: e.target.checked })}
+        />
+        Verified ✓ (twitter only)
+      </label>
     </>
   );
 }

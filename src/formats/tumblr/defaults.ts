@@ -1,43 +1,52 @@
 import type { TumblrPost } from './types';
 
 export const tumblrDefaults: TumblrPost = {
-  entries: [
-    {
-      id: crypto.randomUUID(),
-      username: 'standom-investigations',
-      avatar: { src: '', alt: '' },
-      content:
-        'okay i have spent the last six hours in the catra/adora yearbook PDF and i need to share',
-      image: { src: '', alt: '' },
-      tags: ['adora discourse', 'catra discourse', 'vmas 2024', 'long post', 'i have receipts'],
-    },
-    {
-      id: crypto.randomUUID(),
-      username: 'sword-lesbian-prime',
-      avatar: { src: '', alt: '' },
-      content:
-        'op cooked. the part about the matching senior quotes is sending me. they were SO close how do you go from that to "we never dated"',
-      image: { src: '', alt: '' },
-      tags: ['adoracatra', 'putting them in my little jar'],
-    },
-    {
-      id: crypto.randomUUID(),
-      username: 'cherrybonfire-official',
-      avatar: { src: '', alt: '' },
-      content: '',
-      image: { src: '', alt: '' },
-      tags: [],
-    },
-    {
-      id: crypto.randomUUID(),
-      username: 'glimmerglow',
-      avatar: { src: '', alt: '' },
-      content:
-        '@cherrybonfire-official the SILENT REBLOG. she knows something. she knows something.',
-      image: { src: '', alt: '' },
-      tags: ['breaking news'],
-    },
-  ],
-  notes: '47,283 notes',
-  timestamp: '2 days ago',
-};
+    "entries": [
+      {
+        "id": "0a1d436a-6957-4670-ac83-67dd9c8aa0db",
+        "username": "Person 1",
+        "avatar": {
+          "src": "",
+          "alt": ""
+        },
+        "content": "Text 1",
+        "image": {
+          "src": "",
+          "alt": ""
+        },
+        "tags": [
+          "testing"
+        ]
+      },
+      {
+        "id": "8a3127af-d439-4030-a9bf-cc40ddede9f9",
+        "username": "Person 2",
+        "avatar": {
+          "src": "",
+          "alt": ""
+        },
+        "content": "Wow! That previous post was awesome!",
+        "image": {
+          "src": "",
+          "alt": ""
+        },
+        "tags": []
+      },
+      {
+        "id": "152601b8-ea9c-45b8-84ba-714df18c720b",
+        "username": "A user",
+        "avatar": {
+          "src": "",
+          "alt": ""
+        },
+        "content": "",
+        "image": {
+          "src": "",
+          "alt": ""
+        },
+        "tags": []
+      }
+    ],
+    "notes": "47,283 notes",
+    "timestamp": "2 days ago"
+  };

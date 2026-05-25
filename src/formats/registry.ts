@@ -59,5 +59,3 @@ export const formats: FormatDefinition<any>[] = [
     renderImage: (canvas, state) => renderPostImage(canvas, state),
   },
 ];
-
-export type AnyFormat = typeof formats[number];

@@ -8,14 +8,16 @@ function withAttachment(a: TwitterPost['attachment']): TwitterPost {
 }
 
 describe('tweetToMarkdown', () => {
-  it('renders the author as bold name + handle on the first line', () => {
+  it('renders the author as name + handle on the first line', () => {
     const md = tweetToMarkdown({ ...twitterDefaults, replies: [] });
-    expect(md.split('\n')[0]).toBe('CherryBonfire @brightsidercherrybonfire');
+    expect(md.split('\n')[0]).toBe(
+      `${twitterDefaults.author.name} @${twitterDefaults.author.handle}`,
+    );
   });
 
   it('includes the tweet content body', () => {
     const md = tweetToMarkdown({ ...twitterDefaults, replies: [] });
-    expect(md).toContain('Seriously I need to hear from Adora. Is she okay??');
+    expect(md).toContain(twitterDefaults.content);
   });
 
   it('omits attachment rendering for a text-only post', () => {
@@ -42,6 +44,7 @@ describe('tweetToMarkdown', () => {
       avatar: { src: '', alt: '' },
       name: 'Adora',
       handle: 'adoragrayskull',
+      verified: false,
       content: 'We never dated',
     }));
     expect(md).toContain('   Adora @adoragrayskull');
@@ -54,6 +57,7 @@ describe('tweetToMarkdown', () => {
       avatar: { src: '', alt: '' },
       name: 'A',
       handle: 'a',
+      verified: false,
       content: 'line one\nline two',
     }));
     expect(md).toContain('   line one');
@@ -83,13 +87,38 @@ describe('tweetToMarkdown', () => {
   });
 
   it('separates each reply with a horizontal rule', () => {
-    const md = tweetToMarkdown(twitterDefaults);
+    const withReplies: TwitterPost = {
+      ...twitterDefaults,
+      replies: [
+        {
+          id: 'r1', avatar: { src: '', alt: '' },
+          name: 'R1', handle: 'r1', verified: false,
+          relativeTime: '', replyingTo: 'op',
+          content: 'first', attachment: { type: 'text' }, showStats: true,
+        },
+        {
+          id: 'r2', avatar: { src: '', alt: '' },
+          name: 'R2', handle: 'r2', verified: false,
+          relativeTime: '', replyingTo: 'op',
+          content: 'second', attachment: { type: 'text' }, showStats: true,
+        },
+      ],
+    };
+    const md = tweetToMarkdown(withReplies);
     const ruleCount = (md.match(/^---$/gm) ?? []).length;
-    expect(ruleCount).toBe(twitterDefaults.replies.length);
+    expect(ruleCount).toBe(withReplies.replies.length);
   });
 
   it('renders the replyingTo target inside each reply block', () => {
-    const md = tweetToMarkdown(twitterDefaults);
-    expect(md).toContain('Replying to @brightsidercherrybonfire');
+    const withReply: TwitterPost = {
+      ...twitterDefaults,
+      replies: [{
+        id: 'r1', avatar: { src: '', alt: '' },
+        name: 'R1', handle: 'r1', verified: false,
+        relativeTime: '', replyingTo: 'somebody',
+        content: 'reply body', attachment: { type: 'text' }, showStats: true,
+      }],
+    };
+    expect(tweetToMarkdown(withReply)).toContain('Replying to @somebody');
   });
 });
