@@ -124,9 +124,8 @@ format-agnostic.
 
 ## Limitations & roadmap
 
-- Only the **Twitter/X** format exists so far.
-- The tweet layout is a clean re-creation, not a pixel-perfect clone of any
-  specific Twitter/X version.
+- The social media layout is a clean re-creation, not a pixel-perfect clone of any
+  specific social media version, and is not intebded to be.
 - Drafts live in `localStorage`, which is **per-browser** and has a size limit
   (~5 MB); large uploads across many saved drafts can hit it. Use Export to back
   up a draft.
