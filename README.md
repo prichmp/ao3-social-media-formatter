@@ -2,6 +2,9 @@
 
 > ⚠️ **Alpha software — expect bugs.**
 > **Local only. No data leaves your browser.**
+>
+>  Use it here:
+>  https://prichmp.github.io/ao3-social-media-formatter/
 
 A static web app for fan-fiction authors who want to embed social-media-post
 mockups (Twitter/X to start) in their AO3 works. You fill in a form describing a
